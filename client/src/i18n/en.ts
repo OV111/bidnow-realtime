@@ -1,0 +1,97 @@
+export const en = {
+  'app.name': 'BidNow',
+  'nav.auctions': 'Auctions',
+  'nav.login': 'Log in',
+  'nav.logout': 'Log out',
+  'login.name': 'Your name',
+
+  'status.LIVE': 'Live',
+  'status.UPCOMING': 'Upcoming',
+  'status.ENDED': 'Ended',
+
+  'connection.connected': 'Live',
+  'connection.connecting': 'Connecting…',
+  'connection.reconnecting': 'Reconnecting…',
+  'connection.disconnected': 'Disconnected',
+  'connection.offline': 'Offline',
+
+  'state.loading': 'Loading auction…',
+  'state.notFound.title': 'Auction not found',
+  'state.notFound.body': 'This auction does not exist or was removed.',
+  'state.notFound.back': 'Back to auctions',
+  'state.error.title': 'Something went wrong',
+  'state.error.body': 'We could not load this auction.',
+  'state.error.retry': 'Try again',
+  'state.offline.banner': 'You are offline. Bidding is paused until your connection returns.',
+  'state.reconnecting.banner': 'Connection lost. Reconnecting…',
+  'state.pageNotFound': 'Page not found',
+
+  'item.seller': 'Sold by {name}',
+  'item.startPrice': 'Starting price {price}',
+
+  'price.current': 'Current bid',
+  'price.starting': 'Starting bid',
+  'price.leader': 'Leading: {name}',
+  'price.noBids': 'No bids yet',
+  'price.you': 'You',
+
+  'timer.endsIn': 'Ends in',
+  'timer.startsIn': 'Starts in',
+  'timer.ended': 'Auction ended',
+  'timer.extended': 'Time extended by {seconds}s after a late bid',
+
+  'bid.label': 'Your bid',
+  'bid.min': 'Minimum {price}',
+  'bid.submit': 'Place bid',
+  'bid.submitting': 'Placing bid…',
+  'bid.success': 'Your bid of {price} was placed',
+  'bid.quick': 'Bid {price}',
+  'bid.invalid': 'Enter a valid amount',
+  'bid.error.BID_TOO_LOW': 'Bid is too low. Minimum is {price}.',
+  'bid.error.AUCTION_NOT_LIVE': 'This auction is not live yet.',
+  'bid.error.AUCTION_ENDED': 'This auction has already ended.',
+  'bid.error.NOT_AUTHENTICATED': 'Please log in to bid.',
+  'bid.error.ALREADY_LEADING': 'You are already the highest bidder.',
+  'bid.error.SELLER_CANNOT_BID': 'You cannot bid on your own auction.',
+  'bid.error.RATE_LIMITED': 'Too many bids. Please wait a moment.',
+  'bid.error.NOT_FOUND': 'This auction no longer exists.',
+  'bid.error.INTERNAL': 'Something went wrong. Please try again.',
+  'bid.error.TIMEOUT': 'The server did not respond. Check the bid history before retrying.',
+  'bid.error.OFFLINE': 'You are offline. Reconnect to bid.',
+  'bid.sellerNotice': 'This is your auction. You cannot bid on it.',
+
+  'standing.winning': "You're the highest bidder",
+  'standing.outbid': "You've been outbid",
+
+  'history.title': 'Bid history',
+  'history.empty': 'No bids yet. Be the first!',
+  'history.count': '{count} bids',
+
+  'buyNow.button': 'Buy now for {price}',
+  'buyNow.confirm': 'Buy this item now for {price}? This ends the auction.',
+  'buyNow.confirmYes': 'Confirm purchase',
+  'buyNow.cancel': 'Cancel',
+  'buyNow.pending': 'Processing…',
+
+  'winner.you': 'You won this auction for {price}!',
+  'winner.other': '{name} won for {price}',
+  'winner.buyNow': 'Bought instantly with Buy now',
+  'winner.none': 'Auction ended with no bids',
+
+  'guest.title': 'Want to bid?',
+  'guest.cta': 'Log in to bid',
+
+  'viewers.count': '{count} watching',
+
+  'list.title': 'Auctions',
+  'list.filter.live': 'Live',
+  'list.filter.upcoming': 'Upcoming',
+  'list.filter.all': 'All',
+  'list.empty': 'No auctions to show.',
+  'list.join': 'Join',
+  'list.view': 'View',
+  'list.bids': '{count} bids',
+  'list.loading': 'Loading auctions…',
+} as const;
+
+export type MessageKey = keyof typeof en;

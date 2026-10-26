@@ -1,10 +1,28 @@
-import { AuctionPage } from './features/auction/AuctionPage';
+import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-dom';
+import { AppLayout } from './components/AppLayout';
+import AuctionPage from './pages/AuctionPage';
+import AuctionsListPage from './pages/AuctionsListPage';
 import { LiveScreen } from './features/live/LiveScreen';
 
+function LiveRoute() {
+  const { id } = useParams<{ id: string }>();
+  return <LiveScreen auctionId={id!} />;
+}
+
 function App() {
-  const live = window.location.pathname.match(/^\/auctions\/([^/]+)\/live\/?$/);
-  if (live) return <LiveScreen auctionId={live[1]} />;
-  return <AuctionPage />;
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route element={<AppLayout />}>
+          <Route index element={<Navigate t
+          <Route path="auctions" element={<AuctionsListPage />} />
+          <Route path="auctions/:id" elemen
+          <Route path="auctions/:id/live" element={<LiveRoute />} />
+          <Route path="*" element={<Navigat/>
+        </Route>
+      </Routes>
+    </BrowserRouter>
+  );
 }
 
 export default App;
