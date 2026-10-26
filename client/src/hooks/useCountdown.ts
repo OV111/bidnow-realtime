@@ -1,15 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useNow } from './useNow';
 
-export function useCountdown(endsAt: string): number {
-  const target = new Date(endsAt).getTime();
-  const [remaining, setRemaining] = useState(() => Math.max(0, target - Date.now()));
-
-  useEffect(() => {
-    const tick = () => setRemaining(Math.max(0, target - Date.now()));
-    tick();
-    const id = setInterval(tick, 250);
-    return () => clearInterval(id);
-  }, [target]);
-
-  return remaining;
+export function useCountdown(endsAt: string, offsetMs = 0): number {
+  const now = useNow();
+  return Math.max(0, new Date(endsAt).getTime() - (now + offsetMs));
 }

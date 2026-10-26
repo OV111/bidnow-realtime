@@ -30,3 +30,25 @@ export interface AuctionEndedDto {
   finalPrice: number | null;
   reason: EndReason;
 }
+
+export interface AuctionSnapshotDto extends AuctionStateDto {
+  startsAt: string | null;
+  serverTime: string;
+}
+
+export interface BidPlacedDto {
+  auctionId: string;
+  bid: BidDto;
+  currentPrice: number;
+  leaderId: string;
+  endsAt: string;
+}
+
+export interface TimerExtendedDto {
+  auctionId: string;
+  endsAt: string;
+}
+
+export type SnapshotResponse =
+  | { ok: true; auction: AuctionSnapshotDto }
+  | { ok: false; error: 'not_found' };
