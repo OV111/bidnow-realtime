@@ -15,23 +15,29 @@
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
+    "@types/amqplib": "^0.10.8",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^26.6.5",
+    "@types/pg": "^8.23.1",
     "eslint": "^10.13.0",
     "prettier": "^3.9.10",
-    "prisma": "^8.0.0-rc.27",
+    "prisma": "^7.10.1",
+    "socket.io-client": "^4.8.4",
     "tsx": "^4.23.15",
     "typescript": "^6.0.3",
     "vitest": "^5.0.5"
   },
   "dependencies": {
+    "@prisma/adapter-pg": "^7.10.1",
     "@prisma/client": "^7.10.1",
+    "amqplib": "^2.2.0",
     "cors": "^2.8.6",
     "dotenv": "^18.0.9",
     "express": "^5.3.0",
     "jsonwebtoken": "^9.0.3",
+    "pg": "^8.23.1",
     "socket.io": "^4.8.4",
     "zod": "^4.6.7"
   }
