@@ -1,4 +1,3 @@
-
 export function formatPrice(cents: number, currency = 'USD', locale?: string): string {
   return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(cents / 100);
 }
@@ -15,10 +14,10 @@ export function centsToInput(cents: number): string {
 }
 
 // Used by the live screen
-export function formatCents(cents: number):
+export function formatCents(cents: number): string {
   return formatPrice(cents, 'USD', 'en-US');
 }
 
-export function dollarsToCents(dollars: num
+export function dollarsToCents(dollars: number): number {
   return Math.round(dollars * 100);
 }

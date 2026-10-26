@@ -14,11 +14,11 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route element={<AppLayout />}>
-          <Route index element={<Navigate t
+          <Route index element={<Navigate to="/auctions" replace />} />
           <Route path="auctions" element={<AuctionsListPage />} />
-          <Route path="auctions/:id" elemen
+          <Route path="auctions/:id" element={<AuctionPage />} />
           <Route path="auctions/:id/live" element={<LiveRoute />} />
-          <Route path="*" element={<Navigat/>
+          <Route path="*" element={<Navigate to="/auctions" replace />} />
         </Route>
       </Routes>
     </BrowserRouter>
