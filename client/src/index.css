@@ -1,1 +1,40 @@
 @import "tailwindcss";
+@theme {
+  --animate-bid-flash: bid-flash 700ms ease-out;
+  --animate-slide-in: slide-in 400ms ease-out;
+  --animate-extended: extended 2.5s ease-out forwards;
+
+  @keyframes bid-flash {
+    0% {
+      transform: scale(1.1);
+      color: var(--color-amber-300);
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+
+  @keyframes slide-in {
+    from {
+      opacity: 0;
+      transform: translateY(-1.5rem);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes extended {
+    0% {
+      opacity: 0;
+    }
+    10%,
+    80% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+}

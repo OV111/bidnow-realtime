@@ -15,3 +15,17 @@ export function formatCountdown(ms: number): string {
 export function formatClockTime(iso: string): string {
   return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
+
+// Used by the live screen
+export function formatRemaining(ms: number): string {
+  return formatCountdown(Math.ceil(Math.max(0, ms) / 1000) * 1000);
+}
+
+export function formatAgo(iso: string, now = Date.now()): string {
+  const s = Math.floor((now - new Date(iso).getTime()) / 1000);
+  if (s < 5) return 'just now';
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  return `${Math.floor(m / 60)}h ago`;
+}
