@@ -1,5 +1,7 @@
+import { AuctionPage } from './features/auction/AuctionPage';
+
 function App() {
-  return <div>Hello World</div>;
+  return <AuctionPage />;
 }
 
 export default App;
