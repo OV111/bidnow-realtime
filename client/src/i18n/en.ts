@@ -6,7 +6,7 @@ export const en = {
   'login.name': 'Your name',
 
   'status.LIVE': 'Live',
-  'status.UPCOMING': 'Upcoming',
+  'status.SCHEDULED': 'Upcoming',
   'status.ENDED': 'Ended',
 
   'connection.connected': 'Live',

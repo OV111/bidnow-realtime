@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { AuctionSnapshot } from '@shared/events';
+import type { AuctionSnapshot } from '@shared/types';
 import { t } from '../../../i18n';
 import { centsToInput, formatPrice } from '../../../lib/money';
 import { nextMinBid } from '../helpers';

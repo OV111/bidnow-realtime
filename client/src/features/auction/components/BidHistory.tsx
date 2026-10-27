@@ -1,4 +1,4 @@
-import type { BidDto } from '@shared/events';
+import type { BidDto } from '@shared/types';
 import { t } from '../../../i18n';
 import { formatPrice } from '../../../lib/money';
 import { formatClockTime } from '../../../lib/time';

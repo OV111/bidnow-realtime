@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import type { AuctionSummary } from '@shared/events';
+import type { AuctionSummary } from '@shared/types';
 import { StatusBadge } from '../../components/StatusBadge';
 import { t } from '../../i18n';
 import { formatPrice } from '../../lib/money';
@@ -8,7 +8,7 @@ import { useNow } from '../../lib/useNow';
 
 export function AuctionCard({ auction }: { auction: AuctionSummary }) {
   const now = useNow();
-  const upcoming = auction.status === 'UPCOMING' && auction.startsAt;
+  const upcoming = auction.status === 'SCHEDULED' && auction.startsAt;
   const remaining = new Date(upcoming ? auction.startsAt! : auction.endsAt).getTime() - now;
   const live = auction.status === 'LIVE';
 

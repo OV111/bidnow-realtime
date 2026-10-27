@@ -1,4 +1,4 @@
-import type { AuctionSnapshot } from '@shared/events';
+import type { AuctionSnapshot } from '@shared/types';
 
 export type Standing = 'winning' | 'outbid' | 'none';
 

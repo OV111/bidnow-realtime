@@ -1,4 +1,4 @@
-import type { AuctionSnapshot } from '@shared/events';
+import type { AuctionSnapshot } from '@shared/types';
 import { t } from '../../../i18n';
 import { formatPrice } from '../../../lib/money';
 
@@ -17,7 +17,7 @@ export function WinnerBanner({ snapshot, userId }: { snapshot: AuctionSnapshot; 
       <p className="text-lg font-bold">
         {isMe ? t('winner.you', { price }) : t('winner.other', { name: winner.userName, price })}
       </p>
-      {winner.viaBuyNow && <p className="mt-1 text-sm opacity-80">{t('winner.buyNow')}</p>}
+      {winner.reason === 'buy_now' && <p className="mt-1 text-sm opacity-80">{t('winner.buyNow')}</p>}
     </div>
   );
 }
