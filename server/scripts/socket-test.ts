@@ -5,13 +5,13 @@ import { signToken } from '../src/auth/jwt';
 import { getUser, mockUsers } from '../src/auth/mockUsers';
 import { config } from '../src/config';
 
-// Usage: npm run socket:test -- <auctionId> [userId]
-const [auctionId, userId] = process.argv.slice(2);
+const [auctionId, userArg, amountArg] = process.argv.slice(2);
+const userId = userArg && userArg !== 'guest' ? userArg : null;
 
 if (!auctionId || (userId && !getUser(userId))) {
-  console.log('Usage: npm run socket:test -- <auctionId> [userId]');
-  console.log('Auctions (mock): a-1 live, a-2 scheduled, a-3 ended');
-  console.log(`Users: ${mockUsers.map((u) => u.id).join(', ')} (leave out for guest)`);
+  console.log('Usage: npm run socket:test -- <auctionId> [userId|guest] [bidAmount]');
+  console.log('Auctions: a-1 live, a-2 scheduled, a-3 ended');
+  console.log(`Users: ${mockUsers.map((u) => u.id).join(', ')}, or guest`);
   process.exit(1);
 }
 
@@ -25,7 +25,6 @@ const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(url, { aut
 
 log(`connecting to ${url} as ${userId ?? 'guest'}`);
 
-// Fires on the first connect and after every reconnect, so the room is re-joined automatically.
 socket.on('connect', () => {
   log(`connected ${socket.id}, joining ${auctionId}`);
 
@@ -44,6 +43,14 @@ socket.on('connect', () => {
       viewers: a.viewers,
     });
     for (const b of a.bids) log(`  bid ${b.userName} ${b.amount} at ${b.createdAt}`);
+
+    if (amountArg) {
+      log(`placing bid ${amountArg}`);
+      socket.timeout(5000).emit('bid:place', { auctionId, amount: Number(amountArg) }, (bidErr, bidRes) => {
+        if (bidErr) return log('bid: no reply within 5s');
+        log(bidRes.ok ? `bid accepted: ${bidRes.data.amount}` : `bid rejected: ${bidRes.error}`);
+      });
+    }
   });
 });
 

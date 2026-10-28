@@ -9,6 +9,7 @@
     "start": "node dist/server.js",
     "token": "tsx scripts/token.ts",
     "socket:test": "tsx scripts/socket-test.ts",
+    "bid:spam": "tsx scripts/bid-spam.ts",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:generate": "prisma generate",

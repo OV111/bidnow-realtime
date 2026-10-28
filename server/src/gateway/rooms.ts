@@ -9,7 +9,13 @@ export function registerRoomHandlers(io: AppServer, socket: AppSocket) {
     if (typeof ack !== 'function') return;
     const auctionId = payload?.auctionId;
     if (typeof auctionId !== 'string') return ack({ ok: false, error: 'not_found' });
-    const state = await auctionService.getState(auctionId);
+    let state;
+    try {
+      state = await auctionService.getState(auctionId);
+    } catch (err) {
+      console.error(`[room] getState failed for ${auctionId}`, err);
+      return;
+    }
     if (!state) return ack({ ok: false, error: 'not_found' });
 
     const room = auctionRoom(auctionId);

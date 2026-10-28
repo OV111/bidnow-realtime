@@ -6,6 +6,7 @@ const schema = z.object({
   CLIENT_URL: z.url(),
   JWT_SECRET:z.string().min(1),
   DATABASE_URL: z.string().min(1),
+  BIDS_PER_SECOND: z.coerce.number().int().positive().default(5),
 });
 
 export const config = schema.parse(process.env);
