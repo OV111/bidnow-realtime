@@ -7,6 +7,7 @@ import { authMiddleware } from './gateway/auth';
 import type { AppServer } from './gateway/types';
 import { config } from './config';
 import { registerRoomHandlers } from './gateway/rooms';
+import { auctionsRouter } from './http/auctions';
 
 const app = express();
 app.use(cors({ origin: config.CLIENT_URL }));
@@ -15,6 +16,8 @@ app.use(express.json());
 app.get('/health', (_req, res) => {
   res.json({ ok: true });
 });
+
+app.use('/auctions', auctionsRouter);
 
 const httpServer = createServer(app);
 

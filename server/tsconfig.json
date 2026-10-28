@@ -17,6 +17,6 @@
       "@shared/*": ["../shared/*"]
     }
   },
-  "include": ["src", "scripts", "../shared"],
+  "include": ["src", "scripts", "prisma", "../shared"],
   "exclude": ["node_modules", "dist"]
 }
