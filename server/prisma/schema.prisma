@@ -7,45 +7,64 @@ datasource db {
 }
 
 enum AuctionStatus {
+  SCHEDULED
   LIVE
   ENDED
 }
 
+enum EndReason {
+  TIMER
+  BUY_NOW
+}
+
 model Auction {
   id           String        @id @default(uuid())
-  listingId    String
-  sellerId     String
   title        String
+  description  String?
   photoUrl     String
+  sellerId     String
+  sellerName   String
+  currency     String        @default("USD")
   startPrice   Int
-  buyNowPrice  Int?
   minIncrement Int
+  buyNowPrice  Int?
   currentPrice Int
   leaderId     String?
+  leaderName   String?
+  status       AuctionStatus @default(SCHEDULED)
+  startsAt     DateTime?
   endsAt       DateTime
-  status       AuctionStatus @default(LIVE)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
   bids         Bid[]
   winner       Winner?
-  createdAt    DateTime      @default(now())
+
+  @@index([status, endsAt])
+  @@map("auctions")
 }
 
 model Bid {
   id        String   @id @default(uuid())
   auctionId String
   userId    String
+  userName  String
   amount    Int
   createdAt DateTime @default(now())
-  auction   Auction  @relation(fields: [auctionId], references: [id])
+  auction   Auction  @relation(fields: [auctionId], references: [id], onDelete: Cascade)
 
-  @@index([auctionId, amount])
+  @@index([auctionId, createdAt(sort: Desc)])
+  @@map("bids")
 }
 
 model Winner {
-  id         String   @id @default(uuid())
-  auctionId  String   @unique
+  id         String    @id @default(uuid())
+  auctionId  String    @unique
   userId     String
+  userName   String
   finalPrice Int
-  viaBuyNow  Boolean  @default(false)
-  createdAt  DateTime @default(now())
-  auction    Auction  @relation(fields: [auctionId], references: [id])
+  reason     EndReason
+  createdAt  DateTime  @default(now())
+  auction    Auction   @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+
+  @@map("winners")
 }
