@@ -1,7 +1,13 @@
 import type { Prisma } from '@prisma/client';
 
-import type { AuctionService, AuctionState } from '@shared/auction-service';
-import type { UserDto } from '@shared/types';
+import type {
+  AuctionService,
+  AuctionState,
+  PlaceBidError,
+  PlaceBidInput,
+  PlaceBidOutput,
+} from '@shared/auction-service';
+import type { Result, UserDto } from '@shared/types';
 
 import { prisma } from '../db';
 
@@ -82,8 +88,62 @@ export class PrismaAuctionService implements AuctionService {
     return toState(row);
   }
 
-  async placeBid(): Promise<never> {
-    throw new Error('placeBid: not implemented until Day 3');
+  async placeBid({
+    auctionId,
+    userId,
+    userName,
+    amount,
+  }: PlaceBidInput): Promise<Result<PlaceBidOutput, PlaceBidError>> {
+    return prisma.$transaction(async (tx) => {
+      const auction = await tx.auction.findUnique({ where: { id: auctionId } });
+      const now = new Date();
+
+      if (!auction) return { ok: false, error: 'not_found' };
+      if (auction.status !== 'LIVE' || auction.endsAt <= now) return { ok: false, error: 'not_live' };
+      if (auction.sellerId === userId) return { ok: false, error: 'own_auction' };
+      if (auction.leaderId === userId) return { ok: false, error: 'already_leading' };
+
+      const minBid = auction.leaderId ? auction.currentPrice + auction.minIncrement : auction.startPrice;
+      if (amount < minBid) return { ok: false, error: 'too_low' };
+
+      // Compare-and-swap: only succeeds if nobody else changed the price since we read it.
+      // If another bid committed first, Postgres re-checks this WHERE after its lock and updates 0 rows.
+      const updated = await tx.auction.updateMany({
+        where: {
+          id: auctionId,
+          status: 'LIVE',
+          endsAt: { gt: now },
+          currentPrice: auction.currentPrice,
+          leaderId: auction.leaderId,
+        },
+        data: { currentPrice: amount, leaderId: userId, leaderName: userName },
+      });
+      if (updated.count === 0) return { ok: false, error: 'too_low' };
+
+      const bid = await tx.bid.create({ data: { auctionId, userId, userName, amount } });
+
+      return {
+        ok: true,
+        data: {
+          placed: {
+            auctionId,
+            bid: {
+              id: bid.id,
+              auctionId,
+              userId,
+              userName,
+              amount,
+              createdAt: bid.createdAt.toISOString(),
+            },
+            currentPrice: amount,
+            leaderId: userId,
+            leaderName: userName,
+            endsAt: auction.endsAt.toISOString(),
+          },
+          extended: null,
+        },
+      };
+    });
   }
 
   async buyNow(): Promise<never> {

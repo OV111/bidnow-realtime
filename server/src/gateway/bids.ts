@@ -49,7 +49,6 @@ export function registerBidHandlers(io: AppServer, socket: AppSocket) {
       console.log(`[bid] accepted ${user.id} ${amount} on ${auctionId}${extended ? ' (timer extended)' : ''}`);
 
     } catch (err) {
-      // No ack on purpose: the client's timeout shows "server did not respond".
       console.error(`[bid] placeBid failed for ${auctionId}`, err);
     }
   });

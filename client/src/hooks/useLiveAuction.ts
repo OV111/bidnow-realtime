@@ -1,14 +1,15 @@
-import { useEffect, useReducer } from 'react';
+import { useCallback, useEffect, useReducer, useRef } from 'react';
 
 import type {
   AuctionEndedEvent,
   AuctionStartedEvent,
+  BidError,
   BidPlacedEvent,
   TimerExtendedEvent,
   ViewersEvent,
 } from '@shared/events';
-import type { AuctionSnapshot } from '@shared/types';
-import { createSocket } from '../lib/socket';
+import type { AuctionSnapshot, BidDto, Result } from '@shared/types';
+import { createSocket, type LiveSocket } from '../lib/socket';
 import { createMockLiveSocket } from '../mock/liveSocket';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL as string | undefined;
@@ -20,6 +21,12 @@ export interface LiveState {
   offsetMs: number;
   connected: boolean;
   extendedAt: number | null;
+}
+
+export type BidOutcome = Result<BidDto, BidError | 'timeout' | 'offline'>;
+
+export interface LiveAuction extends LiveState {
+  placeBid: (amount: number) => Promise<BidOutcome>;
 }
 
 type Action =
@@ -95,13 +102,14 @@ function reducer(state: LiveState, action: Action): LiveState {
   }
 }
 
-export function useLiveAuction(auctionId: string): LiveState {
+export function useLiveAuction(auctionId: string, token: string | null = null): LiveAuction {
   const [state, dispatch] = useReducer(reducer, initialState);
+  const socketRef = useRef<LiveSocket | null>(null);
 
   useEffect(() => {
-    const socket = SOCKET_URL ? createSocket(SOCKET_URL) : createMockLiveSocket();
+    const socket = SOCKET_URL ? createSocket(SOCKET_URL, token) : createMockLiveSocket();
+    socketRef.current = socket;
 
-    // Runs on the first connect and on every reconnect, so a fresh snapshot catches up on missed events.
     socket.on('connect', () => {
       dispatch({ type: 'connection', connected: true });
       socket.emit('auction:join', { auctionId }, (res) => {
@@ -116,9 +124,22 @@ export function useLiveAuction(auctionId: string): LiveState {
     socket.on('viewers:update', (payload) => dispatch({ type: 'viewers', payload }));
 
     return () => {
+      socketRef.current = null;
       socket.disconnect();
     };
-  }, [auctionId]);
+  }, [auctionId, token]);
 
-  return state;
+  const placeBid = useCallback(
+    (amount: number) =>
+      new Promise<BidOutcome>((resolve) => {
+        const socket = socketRef.current;
+        if (!socket?.connected) return resolve({ ok: false, error: 'offline' });
+        socket.timeout(5000).emit('bid:place', { auctionId, amount }, (err, res) => {
+          resolve(err ? { ok: false, error: 'timeout' } : res);
+        });
+      }),
+    [auctionId],
+  );
+
+  return { ...state, placeBid };
 }

@@ -1,6 +1,7 @@
 import type { AuctionEndedEvent, BidPlacedEvent } from '@shared/events';
 import type { AuctionSnapshot, BidDto } from '@shared/types';
 import type { LiveSocket } from '../lib/socket';
+import { getAuction } from './auctions';
 
 type Handler = (payload?: unknown) => void;
 
@@ -69,6 +70,8 @@ function buildAuction(auctionId: string): AuctionSnapshot | null {
       winner: { userId: 'u-vahe', userName: 'Vahe', finalPrice: base.currentPrice, reason: 'timer' },
     };
   }
+  const listed = getAuction(auctionId);
+  if (listed) return { ...listed, serverTime: iso(now) };
   return null;
 }
 
@@ -168,6 +171,14 @@ export function createMockLiveSocket(): LiveSocket {
         }
       });
       return socket;
+    },
+    connected: true,
+    timeout(ms: number) {
+      return {
+        emit(_event: string, _payload: unknown, ack?: (err: Error | null) => void) {
+          later(ms, () => ack?.(new Error('timeout')));
+        },
+      };
     },
     disconnect() {
       timers.forEach(clearTimeout);
