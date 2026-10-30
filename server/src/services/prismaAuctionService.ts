@@ -7,9 +7,10 @@ import type {
   PlaceBidInput,
   PlaceBidOutput,
 } from '@shared/auction-service';
-import type { Result, UserDto } from '@shared/types';
+import type { EndReason, Result, UserDto } from '@shared/types';
 
 import { prisma } from '../db';
+import { AuctionEndedEvent } from '@shared/events';
 
 const SNAPSHOT_BIDS = 50;
 
@@ -146,11 +147,35 @@ export class PrismaAuctionService implements AuctionService {
     });
   }
 
+  async closeAuction(auctionId: string): Promise<AuctionEndedEvent | null> {
+    return prisma.$transaction(async (tx) => {
+      const claimedResult = await tx.auction.updateMany({
+        where: { id: auctionId, status: 'LIVE', endsAt: { lte: new Date() } },
+        data: { status: 'ENDED' },
+      });
+      if (claimedResult.count === 0) return null;
+
+      const auction = await tx.auction.findUniqueOrThrow({ where: { id: auctionId } });
+      const reason: EndReason = 'timer';
+      if (!auction.leaderId || !auction.leaderName) {
+        return { auctionId, reason, sold: false, winner: null };
+      }
+      const winner = {
+        userId: auction.leaderId,
+        userName: auction.leaderName,
+        finalPrice: auction.currentPrice,
+        reason,
+      };
+      await tx.winner.create({ data: { auctionId, ...winner, reason: 'TIMER' } })
+      return { auctionId, reason, sold: true, winner };
+    })
+  }
+
   async buyNow(): Promise<never> {
     throw new Error('buyNow: not implemented until Day 6');
   }
 
   subscribe() {
-    return () => {};
+    return () => { };
   }
 }
