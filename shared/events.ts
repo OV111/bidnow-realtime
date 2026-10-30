@@ -9,7 +9,7 @@ import type {
   WinnerDto,
 } from './types';
 
-export type JoinError = 'not_found' | 'rate_limited';
+export type JoinError = 'not_found' | 'rate_limited' | 'invalid_payload' | 'server_error';
 
 export type BidError =
   | 'unauthorized'
@@ -18,7 +18,9 @@ export type BidError =
   | 'too_low'
   | 'own_auction'
   | 'already_leading'
-  | 'rate_limited';
+  | 'rate_limited'
+  | 'invalid_payload'
+  | 'server_error';
 
 export type BuyNowError =
   | 'unauthorized'
