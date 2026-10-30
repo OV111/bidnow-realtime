@@ -6,7 +6,7 @@ export const en = {
   'login.name': 'Your name',
 
   'status.LIVE': 'Live',
-  'status.UPCOMING': 'Upcoming',
+  'status.SCHEDULED': 'Upcoming',
   'status.ENDED': 'Ended',
 
   'connection.connected': 'Live',
@@ -46,6 +46,7 @@ export const en = {
   'bid.submitting': 'Placing bid…',
   'bid.success': 'Your bid of {price} was placed',
   'bid.quick': 'Bid {price}',
+  'bid.quickPlace': 'Quick bid {price}',
   'bid.invalid': 'Enter a valid amount',
   'bid.error.BID_TOO_LOW': 'Bid is too low. Minimum is {price}.',
   'bid.error.AUCTION_NOT_LIVE': 'This auction is not live yet.',

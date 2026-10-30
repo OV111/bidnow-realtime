@@ -1,32 +1,43 @@
-import { useEffect, useReducer } from 'react';
+import { useCallback, useEffect, useReducer, useRef } from 'react';
 
-import { createViewerSocket } from '../lib/socket';
 import type {
-  AuctionEndedDto,
-  AuctionSnapshotDto,
-  BidPlacedDto,
-  TimerExtendedDto,
-} from '../lib/types';
-import { createMockLiveSocket } from '../mocks/liveSocket';
+  AuctionEndedEvent,
+  AuctionStartedEvent,
+  BidError,
+  BidPlacedEvent,
+  TimerExtendedEvent,
+  ViewersEvent,
+} from '@shared/events';
+import type { AuctionSnapshot, BidDto, Result } from '@shared/types';
+import { createSocket, type LiveSocket } from '../lib/socket';
+import { createMockLiveSocket } from '../mock/liveSocket';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL as string | undefined;
 
 export interface LiveState {
   phase: 'loading' | 'not_found' | 'ready';
-  auction: AuctionSnapshotDto | null;
-  ended: AuctionEndedDto | null;
+  auction: AuctionSnapshot | null;
+  ended: AuctionEndedEvent | null;
   offsetMs: number;
   connected: boolean;
   extendedAt: number | null;
 }
 
+export type BidOutcome = Result<BidDto, BidError | 'timeout' | 'offline'>;
+
+export interface LiveAuction extends LiveState {
+  placeBid: (amount: number) => Promise<BidOutcome>;
+}
+
 type Action =
   | { type: 'connection'; connected: boolean }
-  | { type: 'snapshot'; auction: AuctionSnapshotDto }
+  | { type: 'snapshot'; auction: AuctionSnapshot }
   | { type: 'not_found' }
-  | { type: 'bid'; payload: BidPlacedDto }
-  | { type: 'extended'; payload: TimerExtendedDto }
-  | { type: 'ended'; payload: AuctionEndedDto };
+  | { type: 'bid'; payload: BidPlacedEvent }
+  | { type: 'extended'; payload: TimerExtendedEvent }
+  | { type: 'started'; payload: AuctionStartedEvent }
+  | { type: 'ended'; payload: AuctionEndedEvent }
+  | { type: 'viewers'; payload: ViewersEvent };
 
 const initialState: LiveState = {
   phase: 'loading',
@@ -37,13 +48,13 @@ const initialState: LiveState = {
   extendedAt: null,
 };
 
-function endedFromSnapshot(auction: AuctionSnapshotDto): AuctionEndedDto | null {
+function endedFromSnapshot(auction: AuctionSnapshot): AuctionEndedEvent | null {
   if (auction.status !== 'ENDED') return null;
   return {
     auctionId: auction.id,
-    winnerId: auction.leaderId,
-    finalPrice: auction.leaderId ? auction.currentPrice : null,
-    reason: 'timer',
+    reason: auction.winner?.reason ?? 'timer',
+    sold: auction.winner !== null,
+    winner: auction.winner,
   };
 }
 
@@ -75,40 +86,60 @@ function reducer(state: LiveState, action: Action): LiveState {
           ...auction,
           currentPrice: action.payload.currentPrice,
           leaderId: action.payload.leaderId,
+          leaderName: action.payload.leaderName,
           endsAt: action.payload.endsAt,
           bids: [action.payload.bid, ...auction.bids],
         },
       };
     case 'extended':
       return { ...state, auction: { ...auction, endsAt: action.payload.endsAt }, extendedAt: Date.now() };
+    case 'started':
+      return { ...state, auction: { ...auction, status: 'LIVE' } };
     case 'ended':
-      return { ...state, auction: { ...auction, status: 'ENDED' }, ended: action.payload };
+      return { ...state, auction: { ...auction, status: 'ENDED', winner: action.payload.winner }, ended: action.payload };
+    case 'viewers':
+      return { ...state, auction: { ...auction, viewers: action.payload.count } };
   }
 }
 
-export function useLiveAuction(auctionId: string): LiveState {
+export function useLiveAuction(auctionId: string, token: string | null = null): LiveAuction {
   const [state, dispatch] = useReducer(reducer, initialState);
+  const socketRef = useRef<LiveSocket | null>(null);
 
   useEffect(() => {
-    const socket = SOCKET_URL ? createViewerSocket(SOCKET_URL) : createMockLiveSocket();
+    const socket = SOCKET_URL ? createSocket(SOCKET_URL, token) : createMockLiveSocket();
+    socketRef.current = socket;
 
     socket.on('connect', () => {
       dispatch({ type: 'connection', connected: true });
-      socket.emit('auction:join', { auctionId, role: 'viewer' });
-      socket.emit('auction:snapshot', { auctionId }, (res) => {
-        dispatch(res.ok ? { type: 'snapshot', auction: res.auction } : { type: 'not_found' });
+      socket.emit('auction:join', { auctionId }, (res) => {
+        dispatch(res.ok ? { type: 'snapshot', auction: res.data } : { type: 'not_found' });
       });
     });
     socket.on('disconnect', () => dispatch({ type: 'connection', connected: false }));
-    socket.on('auction:snapshot', (auction) => dispatch({ type: 'snapshot', auction }));
     socket.on('bid:placed', (payload) => dispatch({ type: 'bid', payload }));
     socket.on('timer:extended', (payload) => dispatch({ type: 'extended', payload }));
+    socket.on('auction:started', (payload) => dispatch({ type: 'started', payload }));
     socket.on('auction:ended', (payload) => dispatch({ type: 'ended', payload }));
+    socket.on('viewers:update', (payload) => dispatch({ type: 'viewers', payload }));
 
     return () => {
+      socketRef.current = null;
       socket.disconnect();
     };
-  }, [auctionId]);
+  }, [auctionId, token]);
 
-  return state;
+  const placeBid = useCallback(
+    (amount: number) =>
+      new Promise<BidOutcome>((resolve) => {
+        const socket = socketRef.current;
+        if (!socket?.connected) return resolve({ ok: false, error: 'offline' });
+        socket.timeout(5000).emit('bid:place', { auctionId, amount }, (err, res) => {
+          resolve(err ? { ok: false, error: 'timeout' } : res);
+        });
+      }),
+    [auctionId],
+  );
+
+  return { ...state, placeBid };
 }

@@ -1,5 +1,5 @@
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { EmptyState } from '../components/PageState';
+import { EmptyState, Spinner } from '../components/PageState';
 import { StatusBadge } from '../components/StatusBadge';
 import { getStanding } from '../features/auction/helpers';
 import { BidBox } from '../features/auction/components/BidBox';
@@ -12,16 +12,20 @@ import { PriceLeader } from '../features/auction/components/PriceLeader';
 import { StandingIndicator } from '../features/auction/components/StandingIndicator';
 import { ViewersCount } from '../features/auction/components/ViewersCount';
 import { WinnerBanner } from '../features/auction/components/WinnerBanner';
+import { useLiveAuction } from '../hooks/useLiveAuction';
 import { t } from '../i18n';
-import { currentUser, getAuction } from '../mock/auctions';
+import { getToken, getUserId } from '../lib/auth';
 
 export default function AuctionPage() {
-  const { id } = useParams();
+  const { id = '' } = useParams();
   const [params] = useSearchParams();
-  const snapshot = getAuction(id);
-  const userId = params.get('guest') ? null : currentUser.id;
+  const token = params.get('guest') ? null : getToken();
+  const userId = getUserId(token);
+  const { phase, auction: snapshot, connected, placeBid } = useLiveAuction(id, token);
 
-  if (!snapshot) {
+  if (phase === 'loading') return <Spinner label={t('state.loading')} />;
+
+  if (phase === 'not_found' || !snapshot) {
     return (
       <EmptyState
         title={t('state.notFound.title')}
@@ -46,6 +50,9 @@ export default function AuctionPage() {
 
       <aside className="lg:col-start-2 lg:row-span-2 lg:row-start-1">
         <div className="space-y-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200 lg:sticky lg:top-20">
+          {!connected && (
+            <p className="rounded-lg bg-amber-100 px-3 py-2 text-sm text-amber-800">{t('state.reconnecting.banner')}</p>
+          )}
           <div className="flex items-center justify-between">
             <StatusBadge status={snapshot.status} />
             <ViewersCount count={snapshot.viewers} />
@@ -56,14 +63,10 @@ export default function AuctionPage() {
           </div>
           {snapshot.status === 'ENDED' && <WinnerBanner snapshot={snapshot} userId={userId} />}
           {live && <StandingIndicator standing={getStanding(snapshot, userId)} />}
-          {live && !userId && <GuestBidPrompt />}
           {live && isSeller && <p className="text-sm text-slate-500">{t('bid.sellerNotice')}</p>}
-          {live && userId && !isSeller && (
-            <>
-              <BidBox snapshot={snapshot} />
-              <BuyNowButton snapshot={snapshot} />
-            </>
-          )}
+          {live && !isSeller && <BidBox snapshot={snapshot} onBid={placeBid} disabled={!userId || !connected} />}
+          {live && !userId && <GuestBidPrompt />}
+          {live && userId && !isSeller && <BuyNowButton snapshot={snapshot} />}
         </div>
       </aside>
 

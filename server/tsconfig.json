@@ -1,9 +1,10 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "commonjs",
-    "moduleResolution": "node",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
     "lib": ["ES2022"],
+    "rootDir": "..",
     "outDir": "dist",
     "strict": true,
     "noUncheckedIndexedAccess": true,
@@ -12,11 +13,10 @@
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "sourceMap": true,
-    "baseUrl": ".",
     "paths": {
       "@shared/*": ["../shared/*"]
     }
   },
-  "include": ["src", "../shared"],
+  "include": ["src", "scripts", "prisma", "../shared"],
   "exclude": ["node_modules", "dist"]
 }
