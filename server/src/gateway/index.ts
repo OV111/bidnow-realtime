@@ -6,11 +6,14 @@ import { config } from '../config';
 import { authMiddleware } from './auth';
 import { registerBidHandlers } from './bids';
 import { registerRoomHandlers } from './rooms';
+import { policies } from '../rateLimit';
+import { createSocketConnectLimit } from '../middleware/socketConnectLimit';
 import type { AppServer } from './types';
 
 export function createGateway(httpServer: HttpServer): AppServer {
   const io: AppServer = new Server(httpServer, { cors: { origin: config.CLIENT_URL } });
 
+  io.use(createSocketConnectLimit('connect', policies.connectIp));
   io.use(authMiddleware);
 
   io.on('connection', (socket) => {

@@ -9,7 +9,7 @@ import type {
   WinnerDto,
 } from './types';
 
-export type JoinError = 'not_found';
+export type JoinError = 'not_found' | 'rate_limited';
 
 export type BidError =
   | 'unauthorized'

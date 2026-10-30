@@ -1,11 +1,11 @@
 import { auctionRoom } from '@shared/events';
 
-import { config } from '../config';
+import { createSocketEventLimit } from '../middleware/socketEventLimit';
+import { policies } from '../rateLimit';
 import { auctionService } from '../services';
-import { createRateLimiter } from './rateLimit';
 import type { AppServer, AppSocket } from './types';
 
-const bidLimiter = createRateLimiter(config.BIDS_PER_SECOND);
+const bidLimit = createSocketEventLimit('bid', policies.bid);
 
 export function registerBidHandlers(io: AppServer, socket: AppSocket) {
   socket.on('bid:place', async (payload, ack) => {
@@ -15,7 +15,8 @@ export function registerBidHandlers(io: AppServer, socket: AppSocket) {
     const user = socket.data.user;
     if (!user) return ack({ ok: false, error: 'unauthorized' });
 
-    if (!bidLimiter(user.id)) {
+    const limit = await bidLimit(socket);
+    if (!limit.allowed) {
       console.log(`[bid] rate limited ${user.id}`);
       return ack({ ok: false, error: 'rate_limited' });
     }

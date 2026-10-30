@@ -9,7 +9,6 @@ const schema = z.object({
     .pipe(z.array(z.url()).min(1)),
   JWT_SECRET:z.string().min(1),
   DATABASE_URL: z.string().min(1),
-  BIDS_PER_SECOND: z.coerce.number().int().positive().default(5),
 });
 
 export const config = schema.parse(process.env);

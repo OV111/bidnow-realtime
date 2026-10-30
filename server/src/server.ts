@@ -6,9 +6,12 @@ import express from 'express';
 import { config } from './config';
 import { createGateway } from './gateway';
 import { auctionsRouter } from './http/auctions';
+import { createHttpRateLimit } from './middleware/httpRateLimit';
+import { policies } from './rateLimit';
 
 const app = express();
 app.use(cors({ origin: config.CLIENT_URL }));
+app.use(createHttpRateLimit('http', policies.http));
 app.use(express.json());
 
 app.get('/health', (_req, res) => {

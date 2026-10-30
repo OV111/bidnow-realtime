@@ -1,12 +1,20 @@
 import { auctionRoom } from "@shared/events";
+import { createSocketEventLimit } from "../middleware/socketEventLimit";
+import { policies } from "../rateLimit";
 import { auctionService } from "../services";
 import type { AppServer, AppSocket } from "./types";
+
+const joinLimit = createSocketEventLimit('join', policies.join);
 
 const viewerCount = (io: AppServer, room: string) => io.sockets.adapter.rooms.get(room)?.size ?? 0;
 
 export function registerRoomHandlers(io: AppServer, socket: AppSocket) {
   socket.on('auction:join', async (payload, ack) => {
     if (typeof ack !== 'function') return;
+
+    const limit = await joinLimit(socket);
+    if (!limit.allowed) return ack({ ok: false, error: 'rate_limited' });
+
     const auctionId = payload?.auctionId;
     if (typeof auctionId !== 'string') return ack({ ok: false, error: 'not_found' });
     let state;
