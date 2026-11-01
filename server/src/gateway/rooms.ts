@@ -2,6 +2,7 @@ import { auctionRoom } from "@shared/events";
 import { createSocketEventLimit } from "../middleware/socketEventLimit";
 import { policies } from "../rateLimit";
 import { auctionService } from "../services";
+import { auctionIdSchema } from "./schemas";
 import type { AppServer, AppSocket } from "./types";
 
 const joinLimit = createSocketEventLimit('join', policies.join);
@@ -12,38 +13,38 @@ export function registerRoomHandlers(io: AppServer, socket: AppSocket) {
   socket.on('auction:join', async (payload, ack) => {
     if (typeof ack !== 'function') return;
 
-    const limit = await joinLimit(socket);
-    if (!limit.allowed) return ack({ ok: false, error: 'rate_limited' });
+    const { allowed } = await joinLimit(socket);
+    if (!allowed) return ack({ ok: false, error: 'rate_limited' });
 
-    const auctionId = payload?.auctionId;
-    if (typeof auctionId !== 'string') return ack({ ok: false, error: 'not_found' });
-    let state;
+    const parsed = auctionIdSchema.safeParse(payload);
+    if (!parsed.success) return ack({ ok: false, error: 'invalid_payload' });
+    const { auctionId } = parsed.data;
+
     try {
-      state = await auctionService.getState(auctionId);
-    } catch (err) {
-      console.error(`[room] getState failed for ${auctionId}`, err);
-      return;
-    }
-    if (!state) return ack({ ok: false, error: 'not_found' });
+      const state = await auctionService.getState(auctionId);
+      if (!state) return ack({ ok: false, error: 'not_found' });
 
-    const room = auctionRoom(auctionId);
-    await socket.join(room);
-    const viewers = viewerCount(io, room);
-    //Snapshot goes only to the joining socket, everyone else just gets the new viewer count.
-    ack({ ok: true, data: { ...state, viewers, serverTime: new Date().toISOString() } });
-    socket.to(room).emit('viewers:update', { auctionId, count: viewers });
-    console.log(`[room] ${socket.id} joined ${room} (${viewers} viewers)`);
-  })
+      const room = auctionRoom(auctionId);
+      await socket.join(room);
+      const viewers = viewerCount(io, room);
+
+      ack({ ok: true, data: { ...state, viewers, serverTime: new Date().toISOString() } });
+      socket.to(room).emit('viewers:update', { auctionId, count: viewers });
+    } catch (err) {
+      console.error('join failed', err);
+      ack({ ok: false, error: 'server_error' });
+    }
+  });
+
   socket.on("auction:leave", async (payload) => {
-    const auctionId = payload?.auctionId;
-    if (typeof auctionId !== 'string') return;
+    const parsed = auctionIdSchema.safeParse(payload);
+    if (!parsed.success) return;
+    const { auctionId } = parsed.data;
 
     const room = auctionRoom(auctionId);
     if (!socket.rooms.has(room)) return;
     await socket.leave(room);
-    const viewers = viewerCount(io, room);
-    io.to(room).emit('viewers:update', { auctionId, count: viewers });
-    console.log(`[room] ${socket.id} left ${room} (${viewers} viewers)`);
+    io.to(room).emit('viewers:update', { auctionId, count: viewerCount(io, room) });
   });
 
   socket.on("disconnecting", () => {
