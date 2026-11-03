@@ -21,7 +21,8 @@ export default function AuctionPage() {
   const [params] = useSearchParams();
   const token = params.get('guest') ? null : getToken();
   const userId = getUserId(token);
-  const { phase, auction: snapshot, connected, placeBid } = useLiveAuction(id, token);
+  const { phase, auction: snapshot, connected, sessionExpired, placeBid } = useLiveAuction(id, token);
+  const isGuest = !userId || sessionExpired;
 
   if (phase === 'loading') return <Spinner label={t('state.loading')} />;
 
@@ -53,6 +54,12 @@ export default function AuctionPage() {
           {!connected && (
             <p className="rounded-lg bg-amber-100 px-3 py-2 text-sm text-amber-800">{t('state.reconnecting.banner')}</p>
           )}
+          {sessionExpired && (
+            <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800 ring-1 ring-red-200">
+              <p className="font-semibold">{t('session.expired.title')}</p>
+              <p>{t('session.expired.body')}</p>
+            </div>
+          )}
           <div className="flex items-center justify-between">
             <StatusBadge status={snapshot.status} />
             <ViewersCount count={snapshot.viewers} />
@@ -64,9 +71,9 @@ export default function AuctionPage() {
           {snapshot.status === 'ENDED' && <WinnerBanner snapshot={snapshot} userId={userId} />}
           {live && <StandingIndicator standing={getStanding(snapshot, userId)} />}
           {live && isSeller && <p className="text-sm text-slate-500">{t('bid.sellerNotice')}</p>}
-          {live && !isSeller && <BidBox snapshot={snapshot} onBid={placeBid} disabled={!userId || !connected} />}
-          {live && !userId && <GuestBidPrompt />}
-          {live && userId && !isSeller && <BuyNowButton snapshot={snapshot} />}
+          {live && !isSeller && <BidBox snapshot={snapshot} onBid={placeBid} disabled={isGuest || !connected} />}
+          {live && isGuest && <GuestBidPrompt />}
+          {live && !isGuest && !isSeller && <BuyNowButton snapshot={snapshot} />}
         </div>
       </aside>
 

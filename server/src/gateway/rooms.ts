@@ -18,8 +18,8 @@ export function registerRoomHandlers(io: AppServer, socket: AppSocket) {
 
     const parsed = auctionIdSchema.safeParse(payload);
     if (!parsed.success) return ack({ ok: false, error: 'invalid_payload' });
+    
     const { auctionId } = parsed.data;
-
     try {
       const state = await auctionService.getState(auctionId);
       if (!state) return ack({ ok: false, error: 'not_found' });

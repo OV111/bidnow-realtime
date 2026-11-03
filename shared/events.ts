@@ -66,6 +66,7 @@ export interface ServerToClientEvents {
   'auction:started': (e: AuctionStartedEvent) => void;
   'auction:ended': (e: AuctionEndedEvent) => void;
   'viewers:update': (e: ViewersEvent) => void;
+  'auth:expired': () => void;
 }
 
 export interface ClientToServerEvents {
@@ -86,6 +87,8 @@ export interface ClientToServerEvents {
 
 export interface SocketData {
   user: UserDto | null;
+  tokenExpired: boolean;
+  tokenExp?: number;
 }
 
 export const auctionRoom = (auctionId: string) => `auction:${auctionId}`;

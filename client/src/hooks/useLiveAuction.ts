@@ -1,13 +1,6 @@
-import { useCallback, useEffect, useReducer, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type {
-  AuctionEndedEvent,
-  AuctionStartedEvent,
-  BidError,
-  BidPlacedEvent,
-  TimerExtendedEvent,
-  ViewersEvent,
-} from '@shared/events';
+import type { AuctionEndedEvent, BidError } from '@shared/events';
 import type { AuctionSnapshot, BidDto, Result } from '@shared/types';
 import { createSocket, type LiveSocket } from '../lib/socket';
 import { createMockLiveSocket } from '../mock/liveSocket';
@@ -21,6 +14,7 @@ export interface LiveState {
   offsetMs: number;
   connected: boolean;
   extendedAt: number | null;
+  sessionExpired: boolean;
 }
 
 export type BidOutcome = Result<BidDto, BidError | 'timeout' | 'offline'>;
@@ -29,16 +23,6 @@ export interface LiveAuction extends LiveState {
   placeBid: (amount: number) => Promise<BidOutcome>;
 }
 
-type Action =
-  | { type: 'connection'; connected: boolean }
-  | { type: 'snapshot'; auction: AuctionSnapshot }
-  | { type: 'not_found' }
-  | { type: 'bid'; payload: BidPlacedEvent }
-  | { type: 'extended'; payload: TimerExtendedEvent }
-  | { type: 'started'; payload: AuctionStartedEvent }
-  | { type: 'ended'; payload: AuctionEndedEvent }
-  | { type: 'viewers'; payload: ViewersEvent };
-
 const initialState: LiveState = {
   phase: 'loading',
   auction: null,
@@ -46,6 +30,7 @@ const initialState: LiveState = {
   offsetMs: 0,
   connected: false,
   extendedAt: null,
+  sessionExpired: false,
 };
 
 function endedFromSnapshot(auction: AuctionSnapshot): AuctionEndedEvent | null {
@@ -58,70 +43,63 @@ function endedFromSnapshot(auction: AuctionSnapshot): AuctionEndedEvent | null {
   };
 }
 
-function reducer(state: LiveState, action: Action): LiveState {
-  switch (action.type) {
-    case 'connection':
-      return { ...state, connected: action.connected };
-    case 'not_found':
-      return { ...state, phase: 'not_found' };
-    case 'snapshot':
-      return {
-        ...state,
-        phase: 'ready',
-        auction: action.auction,
-        ended: endedFromSnapshot(action.auction),
-        offsetMs: new Date(action.auction.serverTime).getTime() - Date.now(),
-      };
-  }
-
-  const { auction } = state;
-  if (!auction || action.payload.auctionId !== auction.id) return state;
-
-  switch (action.type) {
-    case 'bid':
-      if (auction.bids.some((b) => b.id === action.payload.bid.id)) return state;
-      return {
-        ...state,
-        auction: {
-          ...auction,
-          currentPrice: action.payload.currentPrice,
-          leaderId: action.payload.leaderId,
-          leaderName: action.payload.leaderName,
-          endsAt: action.payload.endsAt,
-          bids: [action.payload.bid, ...auction.bids],
-        },
-      };
-    case 'extended':
-      return { ...state, auction: { ...auction, endsAt: action.payload.endsAt }, extendedAt: Date.now() };
-    case 'started':
-      return { ...state, auction: { ...auction, status: 'LIVE' } };
-    case 'ended':
-      return { ...state, auction: { ...auction, status: 'ENDED', winner: action.payload.winner }, ended: action.payload };
-    case 'viewers':
-      return { ...state, auction: { ...auction, viewers: action.payload.count } };
-  }
-}
-
 export function useLiveAuction(auctionId: string, token: string | null = null): LiveAuction {
-  const [state, dispatch] = useReducer(reducer, initialState);
+  const [state, setState] = useState<LiveState>(initialState);
   const socketRef = useRef<LiveSocket | null>(null);
 
   useEffect(() => {
     const socket = SOCKET_URL ? createSocket(SOCKET_URL, token) : createMockLiveSocket();
     socketRef.current = socket;
 
+    // Apply an update only if the event belongs to the auction we are showing.
+    const patch = (eventAuctionId: string, update: (s: LiveState, a: AuctionSnapshot) => LiveState) =>
+      setState((s) => (s.auction && s.auction.id === eventAuctionId ? update(s, s.auction) : s));
+
     socket.on('connect', () => {
-      dispatch({ type: 'connection', connected: true });
+      setState((s) => ({ ...s, connected: true }));
       socket.emit('auction:join', { auctionId }, (res) => {
-        dispatch(res.ok ? { type: 'snapshot', auction: res.data } : { type: 'not_found' });
+        if (!res.ok) return setState((s) => ({ ...s, phase: 'not_found' }));
+        const offsetMs = new Date(res.data.serverTime).getTime() - Date.now();
+        setState((s) => ({
+          ...s,
+          phase: 'ready',
+          auction: res.data,
+          ended: endedFromSnapshot(res.data),
+          offsetMs,
+        }));
       });
     });
-    socket.on('disconnect', () => dispatch({ type: 'connection', connected: false }));
-    socket.on('bid:placed', (payload) => dispatch({ type: 'bid', payload }));
-    socket.on('timer:extended', (payload) => dispatch({ type: 'extended', payload }));
-    socket.on('auction:started', (payload) => dispatch({ type: 'started', payload }));
-    socket.on('auction:ended', (payload) => dispatch({ type: 'ended', payload }));
-    socket.on('viewers:update', (payload) => dispatch({ type: 'viewers', payload }));
+    socket.on('disconnect', () => setState((s) => ({ ...s, connected: false })));
+    socket.on('auth:expired', () => setState((s) => ({ ...s, sessionExpired: true })));
+
+    socket.on('bid:placed', (p) =>
+      patch(p.auctionId, (s, a) => {
+        if (a.bids.some((b) => b.id === p.bid.id)) return s;
+        return {
+          ...s,
+          auction: {
+            ...a,
+            currentPrice: p.currentPrice,
+            leaderId: p.leaderId,
+            leaderName: p.leaderName,
+            endsAt: p.endsAt,
+            bids: [p.bid, ...a.bids],
+          },
+        };
+      }),
+    );
+    socket.on('timer:extended', (p) =>
+      patch(p.auctionId, (s, a) => ({ ...s, auction: { ...a, endsAt: p.endsAt }, extendedAt: Date.now() })),
+    );
+    socket.on('auction:started', (p) =>
+      patch(p.auctionId, (s, a) => ({ ...s, auction: { ...a, status: 'LIVE' } })),
+    );
+    socket.on('auction:ended', (p) =>
+      patch(p.auctionId, (s, a) => ({ ...s, auction: { ...a, status: 'ENDED', winner: p.winner }, ended: p })),
+    );
+    socket.on('viewers:update', (p) =>
+      patch(p.auctionId, (s, a) => ({ ...s, auction: { ...a, viewers: p.count } })),
+    );
 
     return () => {
       socketRef.current = null;

@@ -30,7 +30,7 @@ export function tryConsume(bucket: Bucket, config: RateLimitConfig, nowMs: numbe
     }
   }
   // not enough tokens, telling user how long to wait for the next one
-  const missingTokens = 1 - refilled.tokens;
+  const missingTokens = 1 - refilled.tokens;  // how far from 1 coin
   const secondsToWait = missingTokens / config.refillPerSec;
   const retryAfterMs = Math.ceil(secondsToWait * 1000);
   const result: RateLimitResult = { allowed: false, remaining: 0, retryAfterMs };

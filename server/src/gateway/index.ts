@@ -18,6 +18,7 @@ export function createGateway(httpServer: HttpServer): AppServer {
 
   io.on('connection', (socket) => {
     console.log(`[socket] connect ${socket.id} as ${socket.data.user?.id ?? 'guest'}`);
+    if (socket.data.tokenExpired === true) socket.emit('auth:expired');
     registerRoomHandlers(io, socket);
     registerBidHandlers(io, socket);
 

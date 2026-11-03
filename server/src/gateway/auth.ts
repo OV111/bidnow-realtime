@@ -12,8 +12,8 @@ export function authMiddleware(socket: AppSocket, next: (err?: Error) => void) {
 
   const result = verifyToken(token);
   if (result.status === 'expired') {
-    // TODO: tell the client (auth:expired)  it.
-    console.log(`[auth] expired token, connecting ${socket.id} as guest`);
+    socket.data.tokenExpired = true;
+    console.log(`auth expired token, connecting as guest`);
     return next();
   }
   if (result.status === 'invalid') return next(new Error('unauthorized'));
@@ -22,5 +22,7 @@ export function authMiddleware(socket: AppSocket, next: (err?: Error) => void) {
   if (!user) return next(new Error('unauthorized'));
 
   socket.data.user = user;
+  // after user connected, we save token that user cant rejoin with expired token
+  socket.data.tokenExp = result.exp;
   next();
 }

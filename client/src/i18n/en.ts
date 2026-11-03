@@ -82,6 +82,9 @@ export const en = {
   'guest.title': 'Want to bid?',
   'guest.cta': 'Log in to bid',
 
+  'session.expired.title': 'Your session expired',
+  'session.expired.body': 'Log in again to place bids. You can still watch this auction.',
+
   'viewers.count': '{count} watching',
 
   'list.title': 'Auctions',
