@@ -11,6 +11,7 @@ import { policies } from './rateLimit';
 import { startAuctionCloser } from './services/auctionCloser';
 
 const app = express();
+app.set('trust proxy', config.TRUST_PROXY);
 app.use(cors({ origin: config.CLIENT_URL }));
 app.use(createHttpRateLimit('http', policies.http));
 app.use(express.json());
