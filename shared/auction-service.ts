@@ -10,7 +10,7 @@ import type { AuctionSnapshot, Result } from './types';
 
 export type AuctionState = Omit<AuctionSnapshot, 'viewers' | 'serverTime'>;
 export type PlaceBidError = Exclude<BidError, 'unauthorized' | 'rate_limited'>;
-export type BuyNowServiceError = Exclude<BuyNowError, 'unauthorized'>;
+export type BuyNowServiceError = Exclude<BuyNowError, 'unauthorized' | 'rate_limited' | 'invalid_payload' | 'server_error'>;
 
 export interface PlaceBidInput {
   auctionId: string;

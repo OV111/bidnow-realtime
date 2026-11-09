@@ -3,6 +3,7 @@ import { auctionRoom } from '@shared/events';
 import { createSocketEventLimit } from '../middleware/socketEventLimit';
 import { policies } from '../rateLimit';
 import { auctionService } from '../services';
+import { scheduleClose } from '../services/auctionCloser';
 import { guard } from './guard';
 import { bidSchema } from './schemas';
 import type { AppServer, AppSocket } from './types';
@@ -34,7 +35,10 @@ export function registerBidHandlers(io: AppServer, socket: AppSocket) {
       const { placed, extended } = result.data;
       ack({ ok: true, data: placed.bid });
       io.to(room).emit('bid:placed', placed);
-      if (extended) io.to(room).emit('timer:extended', extended);
+      if (extended) {
+        io.to(room).emit('timer:extended', extended);
+        scheduleClose(auctionId, extended.endsAt);
+      }
     } catch (err) {
       console.error('placeBid failed', err);
       ack({ ok: false, error: 'server_error' });

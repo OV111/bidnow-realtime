@@ -5,6 +5,7 @@ import { Server } from 'socket.io';
 import { config } from '../config';
 import { authMiddleware } from './auth';
 import { registerBidHandlers } from './bids';
+import { registerBuyNowHandlers } from './buyNow';
 import { registerRoomHandlers } from './rooms';
 import { policies } from '../rateLimit';
 import { createSocketConnectLimit } from '../middleware/socketConnectLimit';
@@ -21,6 +22,7 @@ export function createGateway(httpServer: HttpServer): AppServer {
     if (socket.data.tokenExpired === true) socket.emit('auth:expired');
     registerRoomHandlers(io, socket);
     registerBidHandlers(io, socket);
+    registerBuyNowHandlers(io, socket);
 
     socket.on('disconnect', (reason) => {
       console.log(`[socket] disconnect ${socket.id} (${reason})`);
