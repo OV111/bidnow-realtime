@@ -27,7 +27,10 @@ export type BuyNowError =
   | 'not_found'
   | 'not_live'
   | 'own_auction'
-  | 'no_buy_now';
+  | 'no_buy_now'
+  | 'rate_limited'
+  | 'invalid_payload'
+  | 'server_error';
 
 // Server → room broadcasts.
 export interface BidPlacedEvent {

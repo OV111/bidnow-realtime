@@ -3,14 +3,18 @@ import type { Prisma } from '@prisma/client';
 import type {
   AuctionService,
   AuctionState,
+  BuyNowInput,
+  BuyNowServiceError,
   PlaceBidError,
   PlaceBidInput,
   PlaceBidOutput,
 } from '@shared/auction-service';
+import type { AuctionEndedEvent } from '@shared/events';
 import type { EndReason, Result, UserDto } from '@shared/types';
 
+import { config } from '../config';
 import { prisma } from '../db';
-import { AuctionEndedEvent } from '@shared/events';
+import { notify } from '../notifications/userFlow';
 
 const SNAPSHOT_BIDS = 50;
 
@@ -20,6 +24,27 @@ const withRelations = {
 } satisfies Prisma.AuctionInclude;
 
 type AuctionRow = Prisma.AuctionGetPayload<{ include: typeof withRelations }>;
+type AuctionInfo = { id: string; title: string; currency: string };
+
+function antiSnipeEndsAt(endsAt: Date, now: Date): Date | null {
+  const remaining = endsAt.getTime() - now.getTime();
+  const extended = new Date(now.getTime() + config.ANTI_SNIPE_EXTEND_SEC * 1000);
+  if (remaining >= config.ANTI_SNIPE_WINDOW_SEC * 1000 || extended <= endsAt) return null;
+  return extended;
+}
+
+function notifyWon(auction: AuctionInfo, ended: AuctionEndedEvent) {
+  if (!ended.winner) return;
+  notify({
+    type: 'won',
+    userId: ended.winner.userId,
+    auctionId: auction.id,
+    auctionTitle: auction.title,
+    finalPrice: ended.winner.finalPrice,
+    currency: auction.currency,
+    reason: ended.reason,
+  });
+}
 
 export interface CreateAuctionInput {
   title: string;
@@ -95,17 +120,20 @@ export class PrismaAuctionService implements AuctionService {
     userName,
     amount,
   }: PlaceBidInput): Promise<Result<PlaceBidOutput, PlaceBidError>> {
-    return prisma.$transaction(async (tx) => {
+    const outcome = await prisma.$transaction(async (tx) => {
       const auction = await tx.auction.findUnique({ where: { id: auctionId } });
       const now = new Date();
 
-      if (!auction) return { ok: false, error: 'not_found' };
-      if (auction.status !== 'LIVE' || auction.endsAt <= now) return { ok: false, error: 'not_live' };
-      if (auction.sellerId === userId) return { ok: false, error: 'own_auction' };
-      if (auction.leaderId === userId) return { ok: false, error: 'already_leading' };
+      if (!auction) return { ok: false as const, error: 'not_found' as const };
+      if (auction.status !== 'LIVE' || auction.endsAt <= now) return { ok: false as const, error: 'not_live' as const };
+      if (auction.sellerId === userId) return { ok: false as const, error: 'own_auction' as const };
+      if (auction.leaderId === userId) return { ok: false as const, error: 'already_leading' as const };
 
       const minBid = auction.leaderId ? auction.currentPrice + auction.minIncrement : auction.startPrice;
-      if (amount < minBid) return { ok: false, error: 'too_low' };
+      if (amount < minBid) return { ok: false as const, error: 'too_low' as const };
+
+      const extendedEndsAt = antiSnipeEndsAt(auction.endsAt, now);
+      const endsAt = extendedEndsAt ?? auction.endsAt;
 
       // Compare-and-swap: only succeeds if nobody else changed the price since we read it.
       // If another bid committed first, Postgres re-checks this WHERE after its lock and updates 0 rows.
@@ -117,38 +145,50 @@ export class PrismaAuctionService implements AuctionService {
           currentPrice: auction.currentPrice,
           leaderId: auction.leaderId,
         },
-        data: { currentPrice: amount, leaderId: userId, leaderName: userName },
+        data: { currentPrice: amount, leaderId: userId, leaderName: userName, endsAt },
       });
-      if (updated.count === 0) return { ok: false, error: 'too_low' };
+      if (updated.count === 0) return { ok: false as const, error: 'too_low' as const };
 
       const bid = await tx.bid.create({ data: { auctionId, userId, userName, amount } });
 
-      return {
-        ok: true,
-        data: {
-          placed: {
+      const data: PlaceBidOutput = {
+        placed: {
+          auctionId,
+          bid: {
+            id: bid.id,
             auctionId,
-            bid: {
-              id: bid.id,
-              auctionId,
-              userId,
-              userName,
-              amount,
-              createdAt: bid.createdAt.toISOString(),
-            },
-            currentPrice: amount,
-            leaderId: userId,
-            leaderName: userName,
-            endsAt: auction.endsAt.toISOString(),
+            userId,
+            userName,
+            amount,
+            createdAt: bid.createdAt.toISOString(),
           },
-          extended: null,
+          currentPrice: amount,
+          leaderId: userId,
+          leaderName: userName,
+          endsAt: endsAt.toISOString(),
         },
+        extended: extendedEndsAt && { auctionId, endsAt: extendedEndsAt.toISOString() },
       };
+      return { ok: true as const, data, auction, previousLeaderId: auction.leaderId };
     });
+
+    if (!outcome.ok) return outcome;
+    const { auction, previousLeaderId, data } = outcome;
+    if (previousLeaderId && previousLeaderId !== userId) {
+      notify({
+        type: 'outbid',
+        userId: previousLeaderId,
+        auctionId,
+        auctionTitle: auction.title,
+        currentPrice: amount,
+        currency: auction.currency,
+      });
+    }
+    return { ok: true, data };
   }
 
   async closeAuction(auctionId: string): Promise<AuctionEndedEvent | null> {
-    return prisma.$transaction(async (tx) => {
+    const closed = await prisma.$transaction(async (tx) => {
       const claimedResult = await tx.auction.updateMany({
         where: { id: auctionId, status: 'LIVE', endsAt: { lte: new Date() } },
         data: { status: 'ENDED' },
@@ -158,7 +198,7 @@ export class PrismaAuctionService implements AuctionService {
       const auction = await tx.auction.findUniqueOrThrow({ where: { id: auctionId } });
       const reason: EndReason = 'timer';
       if (!auction.leaderId || !auction.leaderName) {
-        return { auctionId, reason, sold: false, winner: null };
+        return { auction, ended: { auctionId, reason, sold: false, winner: null } };
       }
       const winner = {
         userId: auction.leaderId,
@@ -167,12 +207,58 @@ export class PrismaAuctionService implements AuctionService {
         reason,
       };
       await tx.winner.create({ data: { auctionId, ...winner, reason: 'TIMER' } })
-      return { auctionId, reason, sold: true, winner };
+      return { auction, ended: { auctionId, reason, sold: true, winner } };
     })
+    if (!closed) return null;
+    notifyWon(closed.auction, closed.ended);
+    return closed.ended;
   }
 
-  async buyNow(): Promise<never> {
-    throw new Error('buyNow: not implemented until Day 6');
+  async buyNow({
+    auctionId,
+    userId,
+    userName,
+  }: BuyNowInput): Promise<Result<AuctionEndedEvent, BuyNowServiceError>> {
+    const outcome = await prisma.$transaction(async (tx) => {
+      const auction = await tx.auction.findUnique({ where: { id: auctionId } });
+      const now = new Date();
+
+      if (!auction) return { ok: false as const, error: 'not_found' as const };
+      if (auction.status !== 'LIVE' || auction.endsAt <= now) return { ok: false as const, error: 'not_live' as const };
+      if (auction.sellerId === userId) return { ok: false as const, error: 'own_auction' as const };
+      const price = auction.buyNowPrice;
+      if (price === null || auction.currentPrice >= price) return { ok: false as const, error: 'no_buy_now' as const };
+
+      const claimed = await tx.auction.updateMany({
+        where: { id: auctionId, status: 'LIVE', endsAt: { gt: now } },
+        data: { status: 'ENDED', currentPrice: price, leaderId: userId, leaderName: userName, endsAt: now },
+      });
+      if (claimed.count === 0) return { ok: false as const, error: 'not_live' as const };
+
+      await tx.winner.create({ data: { auctionId, userId, userName, finalPrice: price, reason: 'BUY_NOW' } });
+
+      const ended: AuctionEndedEvent = {
+        auctionId,
+        reason: 'buy_now',
+        sold: true,
+        winner: { userId, userName, finalPrice: price, reason: 'buy_now' },
+      };
+      return { ok: true as const, data: ended, auction, price };
+    });
+
+    if (!outcome.ok) return outcome;
+    notifyWon(outcome.auction, outcome.data);
+    if (outcome.auction.leaderId && outcome.auction.leaderId !== userId) {
+      notify({
+        type: 'outbid',
+        userId: outcome.auction.leaderId,
+        auctionId,
+        auctionTitle: outcome.auction.title,
+        currentPrice: outcome.price,
+        currency: outcome.auction.currency,
+      });
+    }
+    return { ok: true, data: outcome.data };
   }
 
   subscribe() {

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 
 import { auctionService } from '../services';
+import { scheduleClose } from '../services/auctionCloser';
 import { requireUser, type AuthLocals } from './requireUser';
 
 const cents = z.number().int().positive();
@@ -47,6 +48,7 @@ auctionsRouter.post<'/', unknown, unknown, unknown, unknown, AuthLocals>('/', re
     startsAt: body.startsAt ? new Date(body.startsAt) : null,
     endsAt: new Date(body.endsAt),
   });
+  if (auction.status === 'LIVE') scheduleClose(auction.id, auction.endsAt);
   res.status(201).json(auction);
 });
 

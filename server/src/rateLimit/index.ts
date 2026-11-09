@@ -7,6 +7,7 @@ export type { RateLimitConfig, RateLimitResult, RateLimitStore } from './types';
 
 export const policies = {
   bid: { capacity: 5, refillPerSec: 2 },
+  buyNow: { capacity: 3, refillPerSec: 0.5 },
   join: { capacity: 10, refillPerSec: 1 },
   connectIp: { capacity: 30, refillPerSec: 1 },
   http: { capacity: 100, refillPerSec: 5 },
