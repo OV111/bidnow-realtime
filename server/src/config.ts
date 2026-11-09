@@ -9,7 +9,12 @@ const schema = z.object({
     .pipe(z.array(z.url()).min(1)),
   JWT_SECRET: z.string().min(1),
   DATABASE_URL: z.string().min(1),
+  REDIS_URL: z.string().min(1).optional(),
   TRUST_PROXY: z.coerce.number().int().min(0).default(0),
+
+  MAX_OPEN_AUCTIONS_PER_SELLER: z.coerce.number().int().positive().default(5),
+  LIST_PAGE_DEFAULT: z.coerce.number().int().positive().default(20),
+  LIST_PAGE_MAX: z.coerce.number().int().positive().default(50),
 });
 
 export const config = schema.parse(process.env);
