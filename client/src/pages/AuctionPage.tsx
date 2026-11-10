@@ -26,6 +26,29 @@ export default function AuctionPage() {
 
   if (phase === 'loading') return <Spinner label={t('state.loading')} />;
 
+  if (phase === 'error') {
+    return (
+      <EmptyState
+        title={t('state.error.title')}
+        body={t('state.error.body')}
+        action={
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white"
+            >
+              {t('state.error.retry')}
+            </button>
+            <Link to={`/auctions/${id}?guest=1`} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700">
+              {t('state.error.guest')}
+            </Link>
+          </div>
+        }
+      />
+    );
+  }
+
   if (phase === 'not_found' || !snapshot) {
     return (
       <EmptyState

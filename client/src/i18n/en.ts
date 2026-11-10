@@ -19,6 +19,7 @@ export const en = {
   'state.notFound.title': 'Auction not found',
   'state.notFound.body': 'This auction does not exist or was removed.',
   'state.notFound.back': 'Back to auctions',
+  'state.error.guest': 'Continue as guest',
   'state.error.title': 'Something went wrong',
   'state.error.body': 'We could not load this auction.',
   'state.error.retry': 'Try again',

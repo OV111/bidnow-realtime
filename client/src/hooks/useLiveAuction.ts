@@ -2,13 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { AuctionEndedEvent, BidError, BuyNowError } from '@shared/events';
 import type { AuctionSnapshot, BidDto, Result, WinnerDto } from '@shared/types';
+import { clearToken } from '../lib/auth';
 import { createSocket, type LiveSocket } from '../lib/socket';
 import { createMockLiveSocket } from '../mock/liveSocket';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL as string | undefined;
 
 export interface LiveState {
-  phase: 'loading' | 'not_found' | 'ready';
+  phase: 'loading' | 'not_found' | 'error' | 'ready';
   auction: AuctionSnapshot | null;
   ended: AuctionEndedEvent | null;
   offsetMs: number;
@@ -60,7 +61,8 @@ export function useLiveAuction(auctionId: string, token: string | null = null): 
     socket.on('connect', () => {
       setState((s) => ({ ...s, connected: true }));
       socket.emit('auction:join', { auctionId }, (res) => {
-        if (!res.ok) return setState((s) => ({ ...s, phase: 'not_found' }));
+        // Only a real not_found means "no such auction"; rate_limited / server_error are transient.
+        if (!res.ok) return setState((s) => ({ ...s, phase: res.error === 'not_found' ? 'not_found' : 'error' }));
         const offsetMs = new Date(res.data.serverTime).getTime() - Date.now();
         setState((s) => ({
           ...s,
@@ -70,6 +72,12 @@ export function useLiveAuction(auctionId: string, token: string | null = null): 
           offsetMs,
         }));
       });
+    });
+    // The server rejects the handshake ('unauthorized' for a bad/stale token, 'rate_limited' for the IP
+    // limit). Socket.IO does not retry these, so without this the page would spin forever.
+    socket.on('connect_error', (err) => {
+      if (err.message === 'unauthorized') clearToken();
+      setState((s) => ({ ...s, connected: false, phase: s.phase === 'ready' ? s.phase : 'error' }));
     });
     socket.on('disconnect', () => setState((s) => ({ ...s, connected: false })));
     socket.on('auth:expired', () => setState((s) => ({ ...s, sessionExpired: true })));
