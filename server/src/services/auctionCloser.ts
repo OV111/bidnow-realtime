@@ -38,6 +38,23 @@ export function startAuctionCloser(io: AppServer, intervalMs: number = 1000) {
     if (running) return;
     running = true;
     try {
+      // Start scheduled auctions whose start time has passed. The conditional update means only
+      // one tick (or server instance) promotes and announces each auction.
+      const dueToStart = await prisma.auction.findMany({
+        where: { status: 'SCHEDULED', startsAt: { lte: new Date() } },
+        select: { id: true, endsAt: true },
+        take: 100,
+      });
+      for (const { id, endsAt } of dueToStart) {
+        const promoted = await prisma.auction.updateMany({
+          where: { id, status: 'SCHEDULED' },
+          data: { status: 'LIVE' },
+        });
+        if (promoted.count === 0) continue;
+        io.to(auctionRoom(id)).emit('auction:started', { auctionId: id });
+        scheduleClose(id, endsAt.toISOString());
+      }
+
       const expiredAuctions = await prisma.auction.findMany({
         where: { status: 'LIVE', endsAt: { lte: new Date() } },
         select: { id: true },

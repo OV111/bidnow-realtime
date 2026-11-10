@@ -198,6 +198,46 @@ describe('anti-sniping', () => {
   });
 });
 
+describe('scheduled start', () => {
+  it('a scheduled auction goes live at startsAt, announces it, then accepts bids', async () => {
+    const id = 'e2e-scheduled';
+    await prisma.auction.deleteMany({ where: { id } });
+    await prisma.auction.create({
+      data: {
+        id, title: 'e2e scheduled', sellerId: 'u-seller', sellerName: 'Seller', photoUrl: '',
+        startPrice: 10_000, minIncrement: 1_000, currentPrice: 10_000,
+        status: 'SCHEDULED', startsAt: new Date(Date.now() + 2500), endsAt: new Date(Date.now() + 10 * MIN),
+      },
+    });
+
+    try {
+      const vahe = await connect('u-vahe');
+      const anna = await connect('u-anna');
+      const snap = await join(anna, id);
+      expect(snap.data.status).toBe('SCHEDULED');
+      await join(vahe, id);
+
+      // Before it starts, bidding is refused.
+      expect(await bid(vahe, id, 10_000)).toEqual({ ok: false, error: 'not_live' });
+
+      await new Promise<void>((resolve, reject) => {
+        const t = setTimeout(() => reject(new Error('no auction:started in 10s')), 10_000);
+        anna.on('auction:started', (e) => {
+          if (e.auctionId !== id) return;
+          clearTimeout(t);
+          resolve();
+        });
+      });
+
+      const row = await prisma.auction.findUniqueOrThrow({ where: { id } });
+      expect(row.status).toBe('LIVE');
+      expect((await bid(vahe, id, 10_000)).ok).toBe(true);
+    } finally {
+      await prisma.auction.deleteMany({ where: { id } });
+    }
+  }, 20_000);
+});
+
 describe('auction closing', () => {
   it('closer ends the auction, picks the winner, rejects late bids', async () => {
     const vahe = await connect('u-vahe');
