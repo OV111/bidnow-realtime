@@ -6,7 +6,7 @@ import { summaries } from '../mock/auctions';
 
 const filters: { key: string; label: MessageKey; status?: string }[] = [
   { key: 'live', label: 'list.filter.live', status: 'LIVE' },
-  { key: 'upcoming', label: 'list.filter.upcoming', status: 'UPCOMING' },
+  { key: 'upcoming', label: 'list.filter.upcoming', status: 'SCHEDULED' },
   { key: 'all', label: 'list.filter.all' },
 ];
 

@@ -1,4 +1,4 @@
-import type { AuctionSnapshot } from '@shared/events';
+import type { AuctionSnapshot } from '@shared/types';
 import { t } from '../../../i18n';
 import { formatCountdown } from '../../../lib/time';
 import { useNow } from '../../../lib/useNow';
@@ -10,7 +10,7 @@ export function Countdown({ snapshot }: { snapshot: AuctionSnapshot }) {
     return <p className="text-lg font-semibold text-slate-500">{t('timer.ended')}</p>;
   }
 
-  const upcoming = snapshot.status === 'UPCOMING' && snapshot.startsAt;
+  const upcoming = snapshot.status === 'SCHEDULED' && snapshot.startsAt;
   const target = new Date(upcoming ? snapshot.startsAt! : snapshot.endsAt).getTime();
   const remaining = Math.max(0, target - now);
 

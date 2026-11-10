@@ -3,10 +3,8 @@ import { useLiveAuction } from '../../hooks/useLiveAuction';
 import { useNow } from '../../hooks/useNow';
 import { formatCents } from '../../lib/money';
 import { formatAgo, formatRemaining } from '../../lib/time';
-import type { AuctionEndedDto, AuctionSnapshotDto, BidDto } from '../../lib/types';
-import { USER_NAMES } from '../../mocks/auction';
-
-const nameOf = (userId: string | null) => (userId ? (USER_NAMES[userId] ?? userId) : '');
+import type { AuctionEndedEvent } from '@shared/events';
+import type { AuctionSnapshot, BidDto } from '@shared/types';
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
@@ -40,7 +38,7 @@ function Skeleton() {
   );
 }
 
-function StartsIn({ auction, offsetMs }: { auction: AuctionSnapshotDto; offsetMs: number }) {
+function StartsIn({ auction, offsetMs }: { auction: AuctionSnapshot; offsetMs: number }) {
   const remaining = useCountdown(auction.startsAt ?? auction.endsAt, offsetMs);
   return (
     <Centered>
@@ -52,15 +50,15 @@ function StartsIn({ auction, offsetMs }: { auction: AuctionSnapshotDto; offsetMs
   );
 }
 
-function Winner({ auction, ended }: { auction: AuctionSnapshotDto; ended: AuctionEndedDto }) {
+function Winner({ auction, ended }: { auction: AuctionSnapshot; ended: AuctionEndedEvent }) {
   return (
     <Centered>
       <p className="text-[4vmin] text-zinc-400">{auction.title}</p>
-      {ended.winnerId && ended.finalPrice !== null ? (
+      {ended.winner ? (
         <>
           <p className="text-[16vmin] leading-none font-black text-emerald-400">Sold</p>
-          <p className="text-[12vmin] leading-none font-bold tabular-nums">{formatCents(ended.finalPrice)}</p>
-          <p className="text-[6vmin]">to {nameOf(ended.winnerId)}</p>
+          <p className="text-[12vmin] leading-none font-bold tabular-nums">{formatCents(ended.winner.finalPrice)}</p>
+          <p className="text-[6vmin]">to {ended.winner.userName}</p>
           {ended.reason === 'buy_now' && <p className="text-[3vmin] text-zinc-400">via Buy now</p>}
         </>
       ) : (
@@ -102,7 +100,7 @@ function BidsFeed({ bids, offsetMs }: { bids: BidDto[]; offsetMs: number }) {
           key={bid.id}
           className="animate-slide-in flex items-baseline justify-between rounded-xl bg-zinc-900 px-[2.5vmin] py-[1.5vmin] text-[3.5vmin]"
         >
-          <span className="font-semibold">{nameOf(bid.userId)}</span>
+          <span className="font-semibold">{bid.userName}</span>
           <span className="tabular-nums">{formatCents(bid.amount)}</span>
           <span className="text-[2.5vmin] text-zinc-500">{formatAgo(bid.createdAt, now)}</span>
         </li>
@@ -144,7 +142,7 @@ export function LiveScreen({ auctionId }: { auctionId: string }) {
               <div className="min-h-[30vmin] flex-1 rounded-3xl bg-gradient-to-br from-zinc-700 to-zinc-900" />
             )}
             <h1 className="text-[5vmin] leading-tight font-bold">{auction.title}</h1>
-            <p className="text-[2.5vmin] text-zinc-400">Sold by {nameOf(auction.sellerId)}</p>
+            <p className="text-[2.5vmin] text-zinc-400">Sold by {auction.sellerName}</p>
           </section>
 
           <section className="flex min-h-0 flex-col gap-[3vmin]">
@@ -157,7 +155,7 @@ export function LiveScreen({ auctionId }: { auctionId: string }) {
                 {formatCents(hasBids ? auction.currentPrice : auction.startPrice)}
               </p>
               <p className="mt-[1vmin] text-[4vmin] text-emerald-400">
-                {auction.leaderId ? `${nameOf(auction.leaderId)} is leading` : 'No bids yet'}
+                {auction.leaderId ? `${auction.leaderName} is leading` : 'No bids yet'}
               </p>
             </div>
             <Timer endsAt={auction.endsAt} offsetMs={offsetMs} extendedAt={extendedAt} />

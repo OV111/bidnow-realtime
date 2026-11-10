@@ -1,0 +1,14 @@
+export interface RateLimitConfig {
+  capacity: number;
+  refillPerSec: number;
+}
+
+export interface RateLimitResult {
+  allowed: boolean;
+  remaining: number;
+  retryAfterMs: number;
+}
+
+export interface RateLimitStore {
+  consume(key: string, config: RateLimitConfig): Promise<RateLimitResult>;
+}

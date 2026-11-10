@@ -6,7 +6,7 @@ export const en = {
   'login.name': 'Your name',
 
   'status.LIVE': 'Live',
-  'status.UPCOMING': 'Upcoming',
+  'status.SCHEDULED': 'Upcoming',
   'status.ENDED': 'Ended',
 
   'connection.connected': 'Live',
@@ -19,6 +19,7 @@ export const en = {
   'state.notFound.title': 'Auction not found',
   'state.notFound.body': 'This auction does not exist or was removed.',
   'state.notFound.back': 'Back to auctions',
+  'state.error.guest': 'Continue as guest',
   'state.error.title': 'Something went wrong',
   'state.error.body': 'We could not load this auction.',
   'state.error.retry': 'Try again',
@@ -46,6 +47,7 @@ export const en = {
   'bid.submitting': 'Placing bid…',
   'bid.success': 'Your bid of {price} was placed',
   'bid.quick': 'Bid {price}',
+  'bid.quickPlace': 'Quick bid {price}',
   'bid.invalid': 'Enter a valid amount',
   'bid.error.BID_TOO_LOW': 'Bid is too low. Minimum is {price}.',
   'bid.error.AUCTION_NOT_LIVE': 'This auction is not live yet.',
@@ -72,6 +74,11 @@ export const en = {
   'buyNow.confirmYes': 'Confirm purchase',
   'buyNow.cancel': 'Cancel',
   'buyNow.pending': 'Processing…',
+  'buyNow.error.NOT_AUTHENTICATED': 'Please log in to buy.',
+  'buyNow.error.OWN_AUCTION': 'You cannot buy your own item.',
+  'buyNow.error.UNAVAILABLE': 'Buy now is no longer available for this auction.',
+  'buyNow.error.RATE_LIMITED': 'Too many attempts. Please wait a moment.',
+  'buyNow.error.TIMEOUT': 'The server did not respond. Check if the auction has ended before retrying.',
 
   'winner.you': 'You won this auction for {price}!',
   'winner.other': '{name} won for {price}',
@@ -80,6 +87,9 @@ export const en = {
 
   'guest.title': 'Want to bid?',
   'guest.cta': 'Log in to bid',
+
+  'session.expired.title': 'Your session expired',
+  'session.expired.body': 'Log in again to place bids. You can still watch this auction.',
 
   'viewers.count': '{count} watching',
 

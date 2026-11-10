@@ -1,4 +1,4 @@
-import type { AuctionSnapshot, AuctionSummary, BidDto } from '@shared/events';
+import type { AuctionSnapshot, AuctionSummary, BidDto } from '@shared/types';
 
 export const currentUser = { id: 'me', name: 'You' };
 
@@ -33,12 +33,13 @@ const base = {
   startsAt: null,
   winner: null,
   viewers: 0,
+  serverTime: at(0),
 };
 
 export const auctions: AuctionSnapshot[] = [
   {
     ...base,
-    auctionId: 'vintage-camera',
+    id: 'vintage-camera',
     title: 'Vintage Leica M3 Camera',
     description: '1950s rangefinder in excellent condition. Shutter tested, lens is clean with no haze.',
     sellerId: 'seller-1',
@@ -60,7 +61,7 @@ export const auctions: AuctionSnapshot[] = [
   },
   {
     ...base,
-    auctionId: 'mechanical-watch',
+    id: 'mechanical-watch',
     title: 'Swiss Mechanical Watch',
     description: 'Automatic movement, sapphire crystal, original box and papers.',
     sellerId: 'seller-2',
@@ -78,7 +79,7 @@ export const auctions: AuctionSnapshot[] = [
   },
   {
     ...base,
-    auctionId: 'vinyl-collection',
+    id: 'vinyl-collection',
     title: 'Jazz Vinyl Collection (40 records)',
     description: 'Blue Note and Prestige pressings from the 60s. All sleeves included.',
     sellerId: 'seller-1',
@@ -100,7 +101,7 @@ export const auctions: AuctionSnapshot[] = [
   },
   {
     ...base,
-    auctionId: 'road-bike',
+    id: 'road-bike',
     title: 'Carbon Road Bike',
     description: 'Size 56, Shimano 105 groupset, recently serviced.',
     sellerId: 'seller-2',
@@ -111,14 +112,14 @@ export const auctions: AuctionSnapshot[] = [
     currentPrice: 80_000,
     leaderId: null,
     leaderName: null,
-    status: 'UPCOMING',
+    status: 'SCHEDULED',
     startsAt: at(minutes(30)),
     endsAt: at(minutes(60)),
     bids: [],
   },
   {
     ...base,
-    auctionId: 'oil-painting',
+    id: 'oil-painting',
     title: 'Original Oil Painting – Ararat at Dawn',
     description: '60×80 cm, signed by the artist, framed.',
     sellerId: 'seller-1',
@@ -129,14 +130,14 @@ export const auctions: AuctionSnapshot[] = [
     currentPrice: 30_000,
     leaderId: null,
     leaderName: null,
-    status: 'UPCOMING',
+    status: 'SCHEDULED',
     startsAt: at(minutes(180)),
     endsAt: at(minutes(240)),
     bids: [],
   },
   {
     ...base,
-    auctionId: 'gaming-console',
+    id: 'gaming-console',
     title: 'Retro Gaming Console Bundle',
     description: 'Console, two controllers and 12 cartridges.',
     sellerId: 'seller-2',
@@ -149,7 +150,7 @@ export const auctions: AuctionSnapshot[] = [
     leaderName: 'Davit',
     status: 'ENDED',
     endsAt: at(-minutes(30)),
-    winner: { userId: 'davit', userName: 'Davit', finalPrice: 16_500, viaBuyNow: false },
+    winner: { userId: 'davit', userName: 'Davit', finalPrice: 16_500, reason: 'timer' },
     bids: bids('gaming-console', [
       ['aram', 12_000],
       ['lilit', 14_000],
@@ -158,7 +159,7 @@ export const auctions: AuctionSnapshot[] = [
   },
   {
     ...base,
-    auctionId: 'typewriter',
+    id: 'typewriter',
     title: 'Restored 1960s Typewriter',
     description: 'Fully serviced, new ribbon, comes with the original case.',
     sellerId: 'seller-1',
@@ -171,15 +172,16 @@ export const auctions: AuctionSnapshot[] = [
     leaderName: 'You',
     status: 'ENDED',
     endsAt: at(-minutes(120)),
-    winner: { userId: 'me', userName: 'You', finalPrice: 30_000, viaBuyNow: true },
+    winner: { userId: 'me', userName: 'You', finalPrice: 30_000, reason: 'buy_now' },
     bids: bids('typewriter', [['aram', 9_000]]),
   },
 ];
 
 export const summaries: AuctionSummary[] = auctions.map((a) => ({
-  id: a.auctionId,
+  id: a.id,
   title: a.title,
   photoUrl: a.photoUrl,
+  currency: a.currency,
   currentPrice: a.currentPrice,
   buyNowPrice: a.buyNowPrice,
   status: a.status,
@@ -189,5 +191,5 @@ export const summaries: AuctionSummary[] = auctions.map((a) => ({
 }));
 
 export function getAuction(id: string | undefined): AuctionSnapshot | undefined {
-  return auctions.find((a) => a.auctionId === id);
+  return auctions.find((a) => a.id === id);
 }

@@ -1,9 +1,9 @@
-import type { AuctionStatus } from '@shared/events';
+import type { AuctionStatus } from '@shared/types';
 import { t } from '../i18n';
 
 const styles: Record<AuctionStatus, string> = {
   LIVE: 'bg-red-600 text-white',
-  UPCOMING: 'bg-amber-100 text-amber-800',
+  SCHEDULED: 'bg-amber-100 text-amber-800',
   ENDED: 'bg-slate-200 text-slate-700',
 };
 
