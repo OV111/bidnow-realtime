@@ -6,7 +6,7 @@ import type {
   BuyNowError,
   TimerExtendedEvent,
 } from './events';
-import type { AuctionSnapshot, Result } from './types';
+import type { AuctionSnapshot, AuctionStatus, AuctionSummary, Result } from './types';
 
 export type AuctionState = Omit<AuctionSnapshot, 'viewers' | 'serverTime'>;
 export type PlaceBidError = Exclude<BidError, 'unauthorized' | 'rate_limited'>;
@@ -17,7 +17,7 @@ export interface PlaceBidInput {
   userId: string;
   userName: string;
   amount: number;
-  receivedAt: string; 
+  receivedAt: string;
 }
 
 export interface PlaceBidOutput {
@@ -37,6 +37,7 @@ export type AuctionServiceEvent =
   | { type: 'auction:ended'; payload: AuctionEndedEvent };
 
 export interface AuctionService {
+  listAuctions(opts?: { status?: AuctionStatus; limit?: number }): Promise<AuctionSummary[]>;
   getState(auctionId: string): Promise<AuctionState | null>;
   placeBid(input: PlaceBidInput): Promise<Result<PlaceBidOutput, PlaceBidError>>;
   buyNow(input: BuyNowInput): Promise<Result<AuctionEndedEvent, BuyNowServiceError>>;

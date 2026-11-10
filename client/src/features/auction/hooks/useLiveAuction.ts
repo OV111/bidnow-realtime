@@ -2,9 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { AuctionEndedEvent, BidError, BuyNowError } from '@shared/events';
 import type { AuctionSnapshot, BidDto, Result, WinnerDto } from '@shared/types';
-import { clearToken } from '../lib/auth';
-import { createSocket, type LiveSocket } from '../lib/socket';
-import { createMockLiveSocket } from '../mock/liveSocket';
+import { clearToken } from '../../../lib/auth';
+import { createSocket, type LiveSocket } from '../../../lib/socket';
+import { createMockLiveSocket } from '../../../mock/liveSocket';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL as string | undefined;
 

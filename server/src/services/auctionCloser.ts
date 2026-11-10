@@ -8,17 +8,20 @@ const MAX_TIMER_MS = 60 * 60_000;
 const timers = new Map<string, NodeJS.Timeout>();
 let closeAndBroadcast: ((auctionId: string) => Promise<void>) | null = null;
 
-export function scheduleClose(auctionId: string, endsAt: string) {
-  cancelClose(auctionId);
+export function scheduleAuctionClose(auctionId: string, endsAt: string) {
+  clearTimeout(timers.get(auctionId));
+  timers.delete(auctionId);
   const delay = Math.max(0, new Date(endsAt).getTime() - Date.now());
-  if (delay > MAX_TIMER_MS) return;
+  if (delay > MAX_TIMER_MS) {
+    return;
+  }
   timers.set(auctionId, setTimeout(() => {
     timers.delete(auctionId);
     void closeAndBroadcast?.(auctionId);
   }, delay));
 }
 
-export function cancelClose(auctionId: string) {
+export function cancelAuctionClose(auctionId: string) {
   clearTimeout(timers.get(auctionId));
   timers.delete(auctionId);
 }
@@ -52,7 +55,7 @@ export function startAuctionCloser(io: AppServer, intervalMs: number = 1000) {
         });
         if (promoted.count === 0) continue;
         io.to(auctionRoom(id)).emit('auction:started', { auctionId: id });
-        scheduleClose(id, endsAt.toISOString());
+        scheduleAuctionClose(id, endsAt.toISOString());
       }
 
       const expiredAuctions = await prisma.auction.findMany({
@@ -61,7 +64,7 @@ export function startAuctionCloser(io: AppServer, intervalMs: number = 1000) {
         take: 100,
       })
       for (const { id } of expiredAuctions) {
-        cancelClose(id);
+        cancelAuctionClose(id);
         await closeAndBroadcast?.(id);
       }
     } catch (err) {
@@ -73,7 +76,7 @@ export function startAuctionCloser(io: AppServer, intervalMs: number = 1000) {
 
   void prisma.auction
     .findMany({ where: { status: 'LIVE', endsAt: { gt: new Date() } }, select: { id: true, endsAt: true } })
-    .then((live) => live.forEach(({ id, endsAt }) => scheduleClose(id, endsAt.toISOString())))
+    .then((live) => live.forEach(({ id, endsAt }) => scheduleAuctionClose(id, endsAt.toISOString())))
     .catch((err) => console.log("failed to schedule live auctions", err));
 
   const timer = setInterval(tick, intervalMs);

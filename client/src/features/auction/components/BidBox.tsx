@@ -1,6 +1,6 @@
-import { useState, type FormEvent } from 'react';
+import { useState, type SubmitEvent } from 'react';
 import type { AuctionSnapshot } from '@shared/types';
-import type { BidOutcome } from '../../../hooks/useLiveAuction';
+import type { BidOutcome } from '../hooks/useLiveAuction';
 import { t } from '../../../i18n';
 import { centsToInput, formatPrice, parseAmountToCents } from '../../../lib/money';
 import { bidErrorKey, nextMinBid } from '../helpers';
@@ -42,7 +42,7 @@ export function BidBox({ snapshot, onBid, disabled = false }: Props) {
     }
   }
 
-  function handleSubmit(e: FormEvent) {
+  function handleSubmit(e: SubmitEvent<HTMLFormElement>) {
     e.preventDefault();
     const amount = parseAmountToCents(value);
     if (amount === null || amount <= 0) {
@@ -105,9 +105,8 @@ export function BidBox({ snapshot, onBid, disabled = false }: Props) {
       {message && (
         <p
           role={message.kind === 'error' ? 'alert' : 'status'}
-          className={`rounded-lg px-3 py-2 text-sm ${
-            message.kind === 'error' ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'
-          }`}
+          className={`rounded-lg px-3 py-2 text-sm ${message.kind === 'error' ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'
+            }`}
         >
           {message.text}
         </p>

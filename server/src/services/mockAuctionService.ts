@@ -77,6 +77,10 @@ export class MockAuctionService implements AuctionService {
     return this.auctions.get(auctionId) ?? null;
   }
 
+  async listAuctions(): Promise<never> {
+    throw new Error('listAuctions: not implemented');
+  }
+
   async placeBid(): Promise<never> {
     throw new Error('placeBid: not implemented until Day 3');
   }

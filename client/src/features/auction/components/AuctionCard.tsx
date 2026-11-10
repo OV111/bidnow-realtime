@@ -1,10 +1,10 @@
 import { Link } from 'react-router-dom';
 import type { AuctionSummary } from '@shared/types';
-import { StatusBadge } from '../../components/StatusBadge';
-import { t } from '../../i18n';
-import { formatPrice } from '../../lib/money';
-import { formatCountdown } from '../../lib/time';
-import { useNow } from '../../lib/useNow';
+import { StatusBadge } from '../../../components/StatusBadge';
+import { t } from '../../../i18n';
+import { formatPrice } from '../../../lib/money';
+import { formatCountdown } from '../../../lib/time';
+import { useNow } from '../../../lib/useNow';
 
 export function AuctionCard({ auction }: { auction: AuctionSummary }) {
   const now = useNow();

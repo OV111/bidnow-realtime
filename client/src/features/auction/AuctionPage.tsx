@@ -1,20 +1,17 @@
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { EmptyState, Spinner } from '../components/PageState';
-import { StatusBadge } from '../components/StatusBadge';
-import { getStanding } from '../features/auction/helpers';
-import { BidBox } from '../features/auction/components/BidBox';
-import { BidHistory } from '../features/auction/components/BidHistory';
-import { BuyNowButton } from '../features/auction/components/BuyNowButton';
-import { Countdown } from '../features/auction/components/Countdown';
-import { GuestBidPrompt } from '../features/auction/components/GuestBidPrompt';
-import { ItemInfo } from '../features/auction/components/ItemInfo';
-import { PriceLeader } from '../features/auction/components/PriceLeader';
-import { StandingIndicator } from '../features/auction/components/StandingIndicator';
-import { ViewersCount } from '../features/auction/components/ViewersCount';
-import { WinnerBanner } from '../features/auction/components/WinnerBanner';
-import { useLiveAuction } from '../hooks/useLiveAuction';
-import { t } from '../i18n';
-import { getToken, getUserId } from '../lib/auth';
+import { EmptyState, Spinner } from '../../components/PageState';
+import { StatusBadge } from '../../components/StatusBadge';
+import { getStanding } from './helpers';
+import { BidBox } from './components/BidBox';
+import { BidHistory } from './components/BidHistory';
+import { BuyNowButton } from './components/BuyNowButton';
+import { Countdown } from './components/Countdown';
+import { GuestBidPrompt, ItemInfo, StandingIndicator, ViewersCount } from './components/AuctionInfo';
+import { PriceLeader } from './components/PriceLeader';
+import { WinnerBanner } from './components/WinnerBanner';
+import { useLiveAuction } from './hooks/useLiveAuction';
+import { t } from '../../i18n';
+import { getToken, getUserId } from '../../lib/auth';
 
 export default function AuctionPage() {
   const { id = '' } = useParams();

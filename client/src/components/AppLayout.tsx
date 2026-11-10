@@ -5,9 +5,15 @@ export function AppLayout() {
   return (
     <div className="min-h-dvh bg-slate-50 text-slate-900">
       <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-6xl items-center px-4 lg:px-6">
+        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 lg:px-6">
           <Link to="/auctions" className="text-lg font-extrabold text-indigo-600">
             {t('app.name')}
+          </Link>
+          <Link
+            to="/auctions/new"
+            className="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-indigo-500"
+          >
+            {t('nav.sell')}
           </Link>
         </div>
       </header>

@@ -3,7 +3,7 @@ import { auctionRoom } from '@shared/events';
 import { createSocketEventLimit } from '../middleware/socketEventLimit';
 import { policies } from '../rateLimit';
 import { auctionService } from '../services';
-import { cancelClose } from '../services/auctionCloser';
+import { cancelAuctionClose } from '../services/auctionCloser';
 import { guard } from './guard';
 import { auctionIdSchema } from './schemas';
 import type { AppServer, AppSocket } from './types';
@@ -26,7 +26,7 @@ export function registerBuyNowHandlers(io: AppServer, socket: AppSocket) {
       const result = await auctionService.buyNow({ auctionId, userId: user.id, userName: user.name, receivedAt });
       if (!result.ok) return ack(result);
 
-      cancelClose(auctionId);
+      cancelAuctionClose(auctionId);
       const { winner } = result.data;
       if (!winner) return ack({ ok: false, error: 'server_error' });
       ack({ ok: true, data: winner });

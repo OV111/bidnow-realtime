@@ -1,6 +1,6 @@
-import { useCountdown } from '../../hooks/useCountdown';
-import { useLiveAuction } from '../../hooks/useLiveAuction';
-import { useNow } from '../../hooks/useNow';
+import { useCountdown } from '../auction/hooks/useCountdown';
+import { useLiveAuction } from '../auction/hooks/useLiveAuction';
+import { useNow } from '../auction/hooks/useNow';
 import { formatCents } from '../../lib/money';
 import { formatAgo, formatRemaining } from '../../lib/time';
 import type { AuctionEndedEvent } from '@shared/events';

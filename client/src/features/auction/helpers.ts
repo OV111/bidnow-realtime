@@ -1,5 +1,5 @@
 import type { AuctionSnapshot } from '@shared/types';
-import type { BidOutcome, BuyNowOutcome } from '../../hooks/useLiveAuction';
+import type { BidOutcome, BuyNowOutcome } from './hooks/useLiveAuction';
 import type { MessageKey } from '../../i18n';
 
 export type Standing = 'winning' | 'outbid' | 'none';

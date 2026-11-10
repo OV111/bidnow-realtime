@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { AuctionSnapshot } from '@shared/types';
-import type { BuyNowOutcome } from '../../../hooks/useLiveAuction';
+import type { BuyNowOutcome } from '../hooks/useLiveAuction';
 import { t } from '../../../i18n';
 import { formatPrice } from '../../../lib/money';
 import { buyNowErrorKey } from '../helpers';

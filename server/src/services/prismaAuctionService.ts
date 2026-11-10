@@ -10,7 +10,7 @@ import type {
   PlaceBidOutput,
 } from '@shared/auction-service';
 import type { AuctionEndedEvent } from '@shared/events';
-import type { EndReason, Result, UserDto } from '@shared/types';
+import type { AuctionStatus, AuctionSummary, EndReason, Result, UserDto } from '@shared/types';
 
 import { config } from '../config';
 import { prisma } from '../db';
@@ -94,6 +94,28 @@ function toState(row: AuctionRow): AuctionState {
 }
 
 export class PrismaAuctionService implements AuctionService {
+  async listAuctions({ status, limit }: { status?: AuctionStatus; limit?: number } = {}): Promise<AuctionSummary[]> {
+    const rows = await prisma.auction.findMany({
+      where: status ? { status } : undefined,
+      orderBy: { createdAt: 'desc' },
+      take: Math.min(limit ?? config.LIST_PAGE_DEFAULT, config.LIST_PAGE_MAX),
+      include: { _count: { select: { bids: true } } },
+    });
+
+    return rows.map((row) => ({
+      id: row.id,
+      title: row.title,
+      photoUrl: row.photoUrl,
+      currency: row.currency,
+      currentPrice: row.currentPrice,
+      buyNowPrice: row.buyNowPrice,
+      status: row.status,
+      startsAt: row.startsAt?.toISOString() ?? null,
+      endsAt: row.endsAt.toISOString(),
+      bidCount: row._count.bids,
+    }));
+  }
+
   async getState(auctionId: string) {
     const row = await prisma.auction.findUnique({ where: { id: auctionId }, include: withRelations });
     return row && toState(row);

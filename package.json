@@ -25,5 +25,8 @@
   "homepage": "https://github.com/OV111/bidnow-realtime#readme",
   "devDependencies": {
     "concurrently": "^10.0.6"
+  },
+  "dependencies": {
+    "zod": "^4.6.7"
   }
 }
