@@ -73,6 +73,11 @@ export const en = {
   'buyNow.confirmYes': 'Confirm purchase',
   'buyNow.cancel': 'Cancel',
   'buyNow.pending': 'Processing…',
+  'buyNow.error.NOT_AUTHENTICATED': 'Please log in to buy.',
+  'buyNow.error.OWN_AUCTION': 'You cannot buy your own item.',
+  'buyNow.error.UNAVAILABLE': 'Buy now is no longer available for this auction.',
+  'buyNow.error.RATE_LIMITED': 'Too many attempts. Please wait a moment.',
+  'buyNow.error.TIMEOUT': 'The server did not respond. Check if the auction has ended before retrying.',
 
   'winner.you': 'You won this auction for {price}!',
   'winner.other': '{name} won for {price}',

@@ -21,7 +21,7 @@ export default function AuctionPage() {
   const [params] = useSearchParams();
   const token = params.get('guest') ? null : getToken();
   const userId = getUserId(token);
-  const { phase, auction: snapshot, connected, sessionExpired, placeBid } = useLiveAuction(id, token);
+  const { phase, auction: snapshot, connected, sessionExpired, placeBid, buyNow } = useLiveAuction(id, token);
   const isGuest = !userId || sessionExpired;
 
   if (phase === 'loading') return <Spinner label={t('state.loading')} />;
@@ -73,7 +73,9 @@ export default function AuctionPage() {
           {live && isSeller && <p className="text-sm text-slate-500">{t('bid.sellerNotice')}</p>}
           {live && !isSeller && <BidBox snapshot={snapshot} onBid={placeBid} disabled={isGuest || !connected} />}
           {live && isGuest && <GuestBidPrompt />}
-          {live && !isGuest && !isSeller && <BuyNowButton snapshot={snapshot} />}
+          {live && !isGuest && !isSeller && (
+            <BuyNowButton snapshot={snapshot} onBuyNow={buyNow} disabled={!connected} />
+          )}
         </div>
       </aside>
 

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { AuctionEndedEvent, BidError } from '@shared/events';
-import type { AuctionSnapshot, BidDto, Result } from '@shared/types';
+import type { AuctionEndedEvent, BidError, BuyNowError } from '@shared/events';
+import type { AuctionSnapshot, BidDto, Result, WinnerDto } from '@shared/types';
 import { createSocket, type LiveSocket } from '../lib/socket';
 import { createMockLiveSocket } from '../mock/liveSocket';
 
@@ -18,9 +18,11 @@ export interface LiveState {
 }
 
 export type BidOutcome = Result<BidDto, BidError | 'timeout' | 'offline'>;
+export type BuyNowOutcome = Result<WinnerDto, BuyNowError | 'timeout' | 'offline'>;
 
 export interface LiveAuction extends LiveState {
   placeBid: (amount: number) => Promise<BidOutcome>;
+  buyNow: () => Promise<BuyNowOutcome>;
 }
 
 const initialState: LiveState = {
@@ -119,5 +121,17 @@ export function useLiveAuction(auctionId: string, token: string | null = null): 
     [auctionId],
   );
 
-  return { ...state, placeBid };
+  const buyNow = useCallback(
+    () =>
+      new Promise<BuyNowOutcome>((resolve) => {
+        const socket = socketRef.current;
+        if (!socket?.connected) return resolve({ ok: false, error: 'offline' });
+        socket.timeout(5000).emit('auction:buyNow', { auctionId }, (err, res) => {
+          resolve(err ? { ok: false, error: 'timeout' } : res);
+        });
+      }),
+    [auctionId],
+  );
+
+  return { ...state, placeBid, buyNow };
 }

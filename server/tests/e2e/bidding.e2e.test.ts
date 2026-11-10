@@ -1,0 +1,189 @@
+import { io, type Socket } from 'socket.io-client';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+
+import type { ClientToServerEvents, ServerToClientEvents } from '@shared/events';
+import { signToken } from '../../src/auth/jwt';
+import { prisma } from '../../src/db';
+
+type Client = Socket<ServerToClientEvents, ClientToServerEvents>;
+
+const URL = process.env.SOCKET_URL ?? 'http://localhost:4000';
+const MIN = 60_000;
+const sockets: Client[] = [];
+
+function connect(userId: string | null): Promise<Client> {
+  return new Promise((resolve, reject) => {
+    const s: Client = io(URL, { auth: userId ? { token: signToken(userId) } : {}, forceNew: true });
+    sockets.push(s);
+    s.on('connect', () => resolve(s));
+    s.on('connect_error', reject);
+  });
+}
+
+const ask = <T>(fn: (cb: (r: T) => void) => void) =>
+  new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error('no ack in 5s')), 5000);
+    fn((r) => {
+      clearTimeout(t);
+      resolve(r);
+    });
+  });
+
+const join = (s: Client, auctionId: string) =>
+  ask<any>((cb) => s.emit('auction:join', { auctionId }, cb));
+const bid = (s: Client, auctionId: string, amount: number) =>
+  ask<any>((cb) => s.emit('bid:place', { auctionId, amount }, cb));
+const once = <T>(s: Client, event: string) =>
+  new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(`no ${event} in 10s`)), 10_000);
+    (s as any).once(event, (e: T) => {
+      clearTimeout(t);
+      resolve(e);
+    });
+  });
+
+async function makeAuction(id: string, endsInMs: number) {
+  await prisma.auction.deleteMany({ where: { id } });
+  await prisma.auction.create({
+    data: {
+      id,
+      title: `e2e ${id}`,
+      sellerId: 'u-seller',
+      sellerName: 'Seller',
+      photoUrl: '',
+      startPrice: 10_000,
+      minIncrement: 1_000,
+      currentPrice: 10_000,
+      status: 'LIVE',
+      endsAt: new Date(Date.now() + endsInMs),
+    },
+  });
+}
+
+const LIVE = 'e2e-live';
+const CLOSING = 'e2e-closing';
+
+beforeAll(async () => {
+  await makeAuction(LIVE, 10 * MIN);
+  await makeAuction(CLOSING, 4000);
+});
+
+afterAll(async () => {
+  sockets.forEach((s) => s.disconnect());
+  await prisma.auction.deleteMany({ where: { id: { in: [LIVE, CLOSING] } } });
+  await prisma.$disconnect();
+});
+
+describe('join', () => {
+  it('guest gets a snapshot of a live auction', async () => {
+    const g = await connect(null);
+    const res = await join(g, LIVE);
+    expect(res.ok).toBe(true);
+    expect(res.data).toMatchObject({ id: LIVE, status: 'LIVE', currentPrice: 10_000 });
+  });
+
+  it('unknown auction -> not_found', async () => {
+    const g = await connect(null);
+    expect(await join(g, 'nope')).toEqual({ ok: false, error: 'not_found' });
+  });
+
+  it('bad token is rejected at connect', async () => {
+    await expect(
+      new Promise((_, reject) => {
+        const s = io(URL, { auth: { token: 'garbage' }, forceNew: true });
+        sockets.push(s);
+        s.on('connect_error', reject);
+      }),
+    ).rejects.toThrow('unauthorized');
+  });
+});
+
+describe('bidding rules', () => {
+  it('guest cannot bid', async () => {
+    const g = await connect(null);
+    await join(g, LIVE);
+    expect(await bid(g, LIVE, 11_000)).toEqual({ ok: false, error: 'unauthorized' });
+  });
+
+  it('cannot bid without joining the room', async () => {
+    const v = await connect('u-vahe');
+    expect((await bid(v, LIVE, 11_000)).ok).toBe(false);
+  });
+
+  it('invalid payload is rejected', async () => {
+    const v = await connect('u-vahe');
+    await join(v, LIVE);
+    expect(await bid(v, LIVE, -5)).toEqual({ ok: false, error: 'invalid_payload' });
+  });
+
+  it('seller cannot bid on own auction', async () => {
+    const s = await connect('u-seller');
+    await join(s, LIVE);
+    expect(await bid(s, LIVE, 11_000)).toEqual({ ok: false, error: 'own_auction' });
+  });
+
+  it('valid bid is acked, broadcast to the room, and saved in the DB', async () => {
+    const vahe = await connect('u-vahe');
+    const anna = await connect('u-anna');
+    await join(vahe, LIVE);
+    await join(anna, LIVE);
+
+    const broadcast = once<any>(anna, 'bid:placed');
+    const res = await bid(vahe, LIVE, 11_000);
+    expect(res.ok).toBe(true);
+
+    const ev = await broadcast;
+    expect(ev).toMatchObject({ auctionId: LIVE, currentPrice: 11_000, leaderId: 'u-vahe' });
+
+    const row = await prisma.auction.findUniqueOrThrow({ where: { id: LIVE } });
+    expect(row).toMatchObject({ currentPrice: 11_000, leaderId: 'u-vahe' });
+    expect(await prisma.bid.count({ where: { auctionId: LIVE } })).toBe(1);
+  });
+
+  it('leader cannot outbid themselves', async () => {
+    const vahe = await connect('u-vahe');
+    await join(vahe, LIVE);
+    expect(await bid(vahe, LIVE, 15_000)).toEqual({ ok: false, error: 'already_leading' });
+  });
+
+  it('bid below current + increment -> too_low', async () => {
+    const anna = await connect('u-anna');
+    await join(anna, LIVE);
+    expect(await bid(anna, LIVE, 11_500)).toEqual({ ok: false, error: 'too_low' });
+  });
+
+  it('two simultaneous equal bids: exactly one wins', async () => {
+    const anna = await connect('u-anna');
+    const selvi = await connect('u-selvi');
+    await join(anna, LIVE);
+    await join(selvi, LIVE);
+
+    const [a, b] = await Promise.all([bid(anna, LIVE, 12_000), bid(selvi, LIVE, 12_000)]);
+    expect([a.ok, b.ok].filter(Boolean)).toHaveLength(1);
+
+    const row = await prisma.auction.findUniqueOrThrow({ where: { id: LIVE } });
+    expect(row.currentPrice).toBe(12_000);
+    expect(await prisma.bid.count({ where: { auctionId: LIVE, amount: 12_000 } })).toBe(1);
+  });
+});
+
+describe('auction closing', () => {
+  it('closer ends the auction, picks the winner, rejects late bids', async () => {
+    const vahe = await connect('u-vahe');
+    const anna = await connect('u-anna');
+    await join(vahe, CLOSING);
+    await join(anna, CLOSING);
+    expect((await bid(vahe, CLOSING, 10_000)).ok).toBe(true);
+
+    const ended = await once<any>(anna, 'auction:ended');
+    expect(ended).toMatchObject({
+      auctionId: CLOSING,
+      reason: 'timer',
+      sold: true,
+      winner: { userId: 'u-vahe', finalPrice: 10_000 },
+    });
+
+    expect(await prisma.winner.count({ where: { auctionId: CLOSING } })).toBe(1);
+    expect(await bid(anna, CLOSING, 20_000)).toEqual({ ok: false, error: 'not_live' });
+  }, 20_000);
+});
