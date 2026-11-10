@@ -219,7 +219,7 @@ export class PrismaAuctionService implements AuctionService {
     userId,
     userName,
   }: BuyNowInput): Promise<Result<AuctionEndedEvent, BuyNowServiceError>> {
-    const outcome = await prisma.$transaction(async (tx) => {
+    const attemptBuy = () => prisma.$transaction(async (tx) => {
       const auction = await tx.auction.findUnique({ where: { id: auctionId } });
       const now = new Date();
 
@@ -230,10 +230,11 @@ export class PrismaAuctionService implements AuctionService {
       if (price === null || auction.currentPrice >= price) return { ok: false as const, error: 'no_buy_now' as const };
 
       const claimed = await tx.auction.updateMany({
-        where: { id: auctionId, status: 'LIVE', endsAt: { gt: now } },
+        // Compare-and-swap like placeBid: only claim if no bid landed since we read the row.
+        where: { id: auctionId, status: 'LIVE', endsAt: { gt: now }, currentPrice: auction.currentPrice, leaderId: auction.leaderId },
         data: { status: 'ENDED', currentPrice: price, leaderId: userId, leaderName: userName, endsAt: now },
       });
-      if (claimed.count === 0) return { ok: false as const, error: 'not_live' as const };
+      if (claimed.count === 0) return { ok: false as const, error: 'retry' as const };
 
       await tx.winner.create({ data: { auctionId, userId, userName, finalPrice: price, reason: 'BUY_NOW' } });
 
@@ -246,7 +247,10 @@ export class PrismaAuctionService implements AuctionService {
       return { ok: true as const, data: ended, auction, price };
     });
 
-    if (!outcome.ok) return outcome;
+    // A bid can commit between our read and our claim; re-read and try again a couple of times.
+    let outcome = await attemptBuy();
+    for (let i = 0; i < 2 && !outcome.ok && outcome.error === 'retry'; i++) outcome = await attemptBuy();
+    if (!outcome.ok) return outcome.error === 'retry' ? { ok: false, error: 'not_live' } : outcome;
     notifyWon(outcome.auction, outcome.data);
     if (outcome.auction.leaderId && outcome.auction.leaderId !== userId) {
       notify({

@@ -11,13 +11,20 @@ const URL = process.env.SOCKET_URL ?? 'http://localhost:4000';
 const MIN = 60_000;
 const sockets: Client[] = [];
 
+// One socket per user: the server rate-limits connections per IP (30, refill 1/s).
+const cache = new Map<string, Promise<Client>>();
 function connect(userId: string | null): Promise<Client> {
-  return new Promise((resolve, reject) => {
+  const key = userId ?? 'guest';
+  const cached = cache.get(key);
+  if (cached) return cached;
+  const p = new Promise<Client>((resolve, reject) => {
     const s: Client = io(URL, { auth: userId ? { token: signToken(userId) } : {}, forceNew: true });
     sockets.push(s);
     s.on('connect', () => resolve(s));
     s.on('connect_error', reject);
   });
+  cache.set(key, p);
+  return p;
 }
 
 const ask = <T>(fn: (cb: (r: T) => void) => void) =>
@@ -33,9 +40,9 @@ const join = (s: Client, auctionId: string) =>
   ask<any>((cb) => s.emit('auction:join', { auctionId }, cb));
 const bid = (s: Client, auctionId: string, amount: number) =>
   ask<any>((cb) => s.emit('bid:place', { auctionId, amount }, cb));
-const once = <T>(s: Client, event: string) =>
+const once = <T>(s: Client, event: string, ms = 10_000) =>
   new Promise<T>((resolve, reject) => {
-    const t = setTimeout(() => reject(new Error(`no ${event} in 10s`)), 10_000);
+    const t = setTimeout(() => reject(new Error(`no ${event} in ${ms}ms`)), ms);
     (s as any).once(event, (e: T) => {
       clearTimeout(t);
       resolve(e);
@@ -62,15 +69,19 @@ async function makeAuction(id: string, endsInMs: number) {
 
 const LIVE = 'e2e-live';
 const CLOSING = 'e2e-closing';
+const ANTI = 'e2e-anti-snipe';
 
 beforeAll(async () => {
   await makeAuction(LIVE, 10 * MIN);
-  await makeAuction(CLOSING, 4000);
+  // Anti-sniping extends any bid placed in the last ANTI_SNIPE_WINDOW_SEC (default 10s),
+  // so the closing auction must be bid on while still outside that window.
+  await makeAuction(CLOSING, 14_000);
+  await makeAuction(ANTI, 6_000);
 });
 
 afterAll(async () => {
   sockets.forEach((s) => s.disconnect());
-  await prisma.auction.deleteMany({ where: { id: { in: [LIVE, CLOSING] } } });
+  await prisma.auction.deleteMany({ where: { id: { in: [LIVE, CLOSING, ANTI] } } });
   await prisma.$disconnect();
 });
 
@@ -167,6 +178,26 @@ describe('bidding rules', () => {
   });
 });
 
+describe('anti-sniping', () => {
+  it('a bid inside the final window extends the timer and tells the room', async () => {
+    const selvi = await connect('u-selvi');
+    const anna = await connect('u-anna');
+    await join(selvi, ANTI);
+    const snap = await join(anna, ANTI);
+    const originalEnd = new Date(snap.data.endsAt).getTime();
+
+    const extended = once<any>(anna, 'timer:extended');
+    expect((await bid(selvi, ANTI, 10_000)).ok).toBe(true);
+
+    const ev = await extended;
+    expect(ev.auctionId).toBe(ANTI);
+    expect(new Date(ev.endsAt).getTime()).toBeGreaterThan(originalEnd);
+
+    const row = await prisma.auction.findUniqueOrThrow({ where: { id: ANTI } });
+    expect(row.endsAt.getTime()).toBeGreaterThan(originalEnd);
+  });
+});
+
 describe('auction closing', () => {
   it('closer ends the auction, picks the winner, rejects late bids', async () => {
     const vahe = await connect('u-vahe');
@@ -175,7 +206,15 @@ describe('auction closing', () => {
     await join(anna, CLOSING);
     expect((await bid(vahe, CLOSING, 10_000)).ok).toBe(true);
 
-    const ended = await once<any>(anna, 'auction:ended');
+    // anna's socket is also in other test rooms, so wait for THIS auction's end event.
+    const ended = await new Promise<any>((resolve, reject) => {
+      const t = setTimeout(() => reject(new Error('no auction:ended for closing auction in 25s')), 25_000);
+      anna.on('auction:ended', (e) => {
+        if (e.auctionId !== CLOSING) return;
+        clearTimeout(t);
+        resolve(e);
+      });
+    });
     expect(ended).toMatchObject({
       auctionId: CLOSING,
       reason: 'timer',
@@ -185,5 +224,5 @@ describe('auction closing', () => {
 
     expect(await prisma.winner.count({ where: { auctionId: CLOSING } })).toBe(1);
     expect(await bid(anna, CLOSING, 20_000)).toEqual({ ok: false, error: 'not_live' });
-  }, 20_000);
+  }, 40_000);
 });
