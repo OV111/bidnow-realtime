@@ -15,6 +15,7 @@ import type { AuctionStatus, AuctionSummary, EndReason, Result, UserDto } from '
 import { config } from '../config';
 import { prisma } from '../db';
 import { notify } from '../notifications/userFlow';
+import { cacheAuction, deleteCachedAuction } from '../cache/auctionCache';
 
 const SNAPSHOT_BIDS = 50;
 
@@ -133,7 +134,9 @@ export class PrismaAuctionService implements AuctionService {
       },
       include: withRelations,
     });
-    return toState(row);
+    const state = toState(row);
+    void cacheAuction(state);
+    return state;
   }
 
   async placeBid({
@@ -194,7 +197,10 @@ export class PrismaAuctionService implements AuctionService {
       return { ok: true as const, data, auction, previousLeaderId: auction.leaderId };
     });
 
-    if (!outcome.ok) return outcome;
+    if (!outcome.ok) {
+      return outcome;
+    }
+    void deleteCachedAuction(auctionId);
     const { auction, previousLeaderId, data } = outcome;
     if (previousLeaderId && previousLeaderId !== userId) {
       notify({
@@ -231,7 +237,11 @@ export class PrismaAuctionService implements AuctionService {
       await tx.winner.create({ data: { auctionId, ...winner, reason: 'TIMER' } })
       return { auction, ended: { auctionId, reason, sold: true, winner } };
     })
-    if (!closed) return null;
+    if (!closed) {
+
+      return null;
+    }
+    void deleteCachedAuction(auctionId)
     notifyWon(closed.auction, closed.ended);
     return closed.ended;
   }
@@ -272,7 +282,10 @@ export class PrismaAuctionService implements AuctionService {
     // A bid can commit between our read and our claim; re-read and try again a couple of times.
     let outcome = await attemptBuy();
     for (let i = 0; i < 2 && !outcome.ok && outcome.error === 'retry'; i++) outcome = await attemptBuy();
-    if (!outcome.ok) return outcome.error === 'retry' ? { ok: false, error: 'not_live' } : outcome;
+    if (!outcome.ok) {
+      return outcome.error === 'retry' ? { ok: false, error: 'not_live' } : outcome;
+    }
+    void deleteCachedAuction(auctionId);
     notifyWon(outcome.auction, outcome.data);
     if (outcome.auction.leaderId && outcome.auction.leaderId !== userId) {
       notify({
