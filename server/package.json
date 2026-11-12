@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc",
+    "build": "prisma generate && esbuild src/server.ts --bundle --platform=node --packages=external --tsconfig=tsconfig.json --outfile=dist/server.js",
+    "typecheck": "tsc --noEmit",
     "start": "node dist/server.js",
     "token": "tsx scripts/token.ts",
     "socket:test": "tsx scripts/socket-test.ts",
@@ -28,6 +29,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^26.6.5",
     "@types/pg": "^8.23.1",
+    "esbuild": "^0.28.2",
     "eslint": "^10.13.0",
     "prettier": "^3.9.10",
     "prisma": "^7.10.1",

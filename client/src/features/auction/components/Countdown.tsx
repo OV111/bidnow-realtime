@@ -3,8 +3,9 @@ import { t } from '../../../i18n';
 import { formatCountdown } from '../../../lib/time';
 import { useNow } from '../../../lib/useNow';
 
-export function Countdown({ snapshot }: { snapshot: AuctionSnapshot }) {
-  const now = useNow();
+export function Countdown({ snapshot, offsetMs = 0 }: { snapshot: AuctionSnapshot; offsetMs?: number }) {
+  // offsetMs = server clock minus device clock, so the countdown follows the server's view of "now".
+  const now = useNow() + offsetMs;
 
   if (snapshot.status === 'ENDED') {
     return <p className="text-lg font-semibold text-slate-500">{t('timer.ended')}</p>;

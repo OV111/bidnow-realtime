@@ -145,7 +145,7 @@ export class PrismaAuctionService implements AuctionService {
     userName,
     amount,
   }: PlaceBidInput): Promise<Result<PlaceBidOutput, PlaceBidError>> {
-    const outcome = await prisma.$transaction(async (tx) => {
+    const attempt = () => prisma.$transaction(async (tx) => {
       const auction = await tx.auction.findUnique({ where: { id: auctionId } });
       const now = new Date();
 
@@ -156,6 +156,8 @@ export class PrismaAuctionService implements AuctionService {
 
       const minBid = auction.leaderId ? auction.currentPrice + auction.minIncrement : auction.startPrice;
       if (amount < minBid) return { ok: false as const, error: 'too_low' as const };
+      // A bid at/above the buy-now price would make buy-now unavailable; the buyer should use buy-now instead.
+      if (auction.buyNowPrice !== null && amount >= auction.buyNowPrice) return { ok: false as const, error: 'use_buy_now' as const };
 
       const extendedEndsAt = antiSnipeEndsAt(auction.endsAt, now);
       const endsAt = extendedEndsAt ?? auction.endsAt;
@@ -172,7 +174,8 @@ export class PrismaAuctionService implements AuctionService {
         },
         data: { currentPrice: amount, leaderId: userId, leaderName: userName, endsAt },
       });
-      if (updated.count === 0) return { ok: false as const, error: 'too_low' as const };
+      // Something changed since we read the row; the caller re-reads and re-validates against the fresh state.
+      if (updated.count === 0) return { ok: false as const, error: 'retry' as const };
 
       const bid = await tx.bid.create({ data: { auctionId, userId, userName, amount } });
 
@@ -197,8 +200,11 @@ export class PrismaAuctionService implements AuctionService {
       return { ok: true as const, data, auction, previousLeaderId: auction.leaderId };
     });
 
+    // A competing bid can commit between our read and our swap; re-read and re-validate a couple of times.
+    let outcome = await attempt();
+    for (let i = 0; i < 2 && !outcome.ok && outcome.error === 'retry'; i++) outcome = await attempt();
     if (!outcome.ok) {
-      return outcome;
+      return outcome.error === 'retry' ? { ok: false, error: 'too_low' } : outcome;
     }
     void deleteCachedAuction(auctionId);
     const { auction, previousLeaderId, data } = outcome;

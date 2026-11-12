@@ -3,9 +3,16 @@ import { z } from 'zod';
 // One definition of the create-auction rules, used by the server (POST /auctions) and the client form.
 // Error messages are short codes, not sentences: the client maps them to translated text.
 
-export const MAX_PRICE_CENTS = 2000; // $20.00
+export const MAX_PRICE_CENTS = 100_000_000; // $1,000,000; must stay below DB Int (int32) max of 2,147,483,647
+
+// An auction must run between 1 minute and 30 days (measured from its start), and end within 90 days from now.
+export const MIN_DURATION_MS = 60 * 1000;
+export const MAX_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
+export const MAX_END_HORIZON_MS = 90 * 24 * 60 * 60 * 1000;
 
 export const ERR = {
+  durationTooShort: 'duration_too_short',
+  durationTooLong: 'duration_too_long',
   required: 'required',
   tooLong: 'too_long',
   priceInvalid: 'price_invalid',
@@ -58,6 +65,25 @@ export const createAuctionBody = z
       return end === null || end > Date.now();
     },
     { path: ['endsAt'], error: ERR.endsInPast },
+  )
+  .refine(
+    (b) => {
+      const end = time(b.endsAt);
+      const start = b.startsAt ? time(b.startsAt) : null;
+      if (end === null || end <= Date.now()) return true; // already reported by endsInPast
+      if (start !== null && start >= end) return true; // already reported by startsAfterEnd
+      return end - Math.max(start ?? 0, Date.now()) >= MIN_DURATION_MS;
+    },
+    { path: ['endsAt'], error: ERR.durationTooShort },
+  )
+  .refine(
+    (b) => {
+      const end = time(b.endsAt);
+      const start = b.startsAt ? time(b.startsAt) : null;
+      if (end === null) return true;
+      return end - Math.max(start ?? 0, Date.now()) <= MAX_DURATION_MS && end - Date.now() <= MAX_END_HORIZON_MS;
+    },
+    { path: ['endsAt'], error: ERR.durationTooLong },
   )
   .refine(
     (b) => {
