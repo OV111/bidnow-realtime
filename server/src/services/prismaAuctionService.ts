@@ -15,6 +15,7 @@ import type { AuctionStatus, AuctionSummary, EndReason, Result, UserDto } from '
 import { config } from '../config';
 import { prisma } from '../db';
 import { notify } from '../notifications/userFlow';
+import { cacheAuction, deleteCachedAuction } from '../cache/auctionCache';
 
 const SNAPSHOT_BIDS = 50;
 
@@ -133,7 +134,9 @@ export class PrismaAuctionService implements AuctionService {
       },
       include: withRelations,
     });
-    return toState(row);
+    const state = toState(row);
+    void cacheAuction(state);
+    return state;
   }
 
   async placeBid({
@@ -142,7 +145,7 @@ export class PrismaAuctionService implements AuctionService {
     userName,
     amount,
   }: PlaceBidInput): Promise<Result<PlaceBidOutput, PlaceBidError>> {
-    const outcome = await prisma.$transaction(async (tx) => {
+    const attempt = () => prisma.$transaction(async (tx) => {
       const auction = await tx.auction.findUnique({ where: { id: auctionId } });
       const now = new Date();
 
@@ -153,6 +156,8 @@ export class PrismaAuctionService implements AuctionService {
 
       const minBid = auction.leaderId ? auction.currentPrice + auction.minIncrement : auction.startPrice;
       if (amount < minBid) return { ok: false as const, error: 'too_low' as const };
+      // A bid at/above the buy-now price would make buy-now unavailable; the buyer should use buy-now instead.
+      if (auction.buyNowPrice !== null && amount >= auction.buyNowPrice) return { ok: false as const, error: 'use_buy_now' as const };
 
       const extendedEndsAt = antiSnipeEndsAt(auction.endsAt, now);
       const endsAt = extendedEndsAt ?? auction.endsAt;
@@ -169,7 +174,8 @@ export class PrismaAuctionService implements AuctionService {
         },
         data: { currentPrice: amount, leaderId: userId, leaderName: userName, endsAt },
       });
-      if (updated.count === 0) return { ok: false as const, error: 'too_low' as const };
+      // Something changed since we read the row; the caller re-reads and re-validates against the fresh state.
+      if (updated.count === 0) return { ok: false as const, error: 'retry' as const };
 
       const bid = await tx.bid.create({ data: { auctionId, userId, userName, amount } });
 
@@ -194,7 +200,13 @@ export class PrismaAuctionService implements AuctionService {
       return { ok: true as const, data, auction, previousLeaderId: auction.leaderId };
     });
 
-    if (!outcome.ok) return outcome;
+    // A competing bid can commit between our read and our swap; re-read and re-validate a couple of times.
+    let outcome = await attempt();
+    for (let i = 0; i < 2 && !outcome.ok && outcome.error === 'retry'; i++) outcome = await attempt();
+    if (!outcome.ok) {
+      return outcome.error === 'retry' ? { ok: false, error: 'too_low' } : outcome;
+    }
+    void deleteCachedAuction(auctionId);
     const { auction, previousLeaderId, data } = outcome;
     if (previousLeaderId && previousLeaderId !== userId) {
       notify({
@@ -231,7 +243,11 @@ export class PrismaAuctionService implements AuctionService {
       await tx.winner.create({ data: { auctionId, ...winner, reason: 'TIMER' } })
       return { auction, ended: { auctionId, reason, sold: true, winner } };
     })
-    if (!closed) return null;
+    if (!closed) {
+
+      return null;
+    }
+    void deleteCachedAuction(auctionId)
     notifyWon(closed.auction, closed.ended);
     return closed.ended;
   }
@@ -272,7 +288,10 @@ export class PrismaAuctionService implements AuctionService {
     // A bid can commit between our read and our claim; re-read and try again a couple of times.
     let outcome = await attemptBuy();
     for (let i = 0; i < 2 && !outcome.ok && outcome.error === 'retry'; i++) outcome = await attemptBuy();
-    if (!outcome.ok) return outcome.error === 'retry' ? { ok: false, error: 'not_live' } : outcome;
+    if (!outcome.ok) {
+      return outcome.error === 'retry' ? { ok: false, error: 'not_live' } : outcome;
+    }
+    void deleteCachedAuction(auctionId);
     notifyWon(outcome.auction, outcome.data);
     if (outcome.auction.leaderId && outcome.auction.leaderId !== userId) {
       notify({

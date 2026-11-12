@@ -1,9 +1,6 @@
 import type { AuctionStatus, AuctionSummary } from '@shared/types';
 import type { CreateAuctionPayload } from '../features/createAuction/helpers';
-import { summaries } from '../mock/auctions';
-
-// The HTTP API lives on the same server as the socket. Without a URL the app runs on the mock socket.
-const API_URL = (import.meta.env.VITE_API_URL ?? import.meta.env.VITE_SOCKET_URL) as string | undefined;
+import { API_URL } from './env';
 
 export type CreateAuctionError = 'no_server' | 'unauthorized' | 'invalid' | 'rate_limited' | 'network' | 'server';
 
@@ -36,8 +33,12 @@ export async function createAuction(payload: CreateAuctionPayload, token: string
 export type ListAuctionsResult = { ok: true; data: AuctionSummary[] } | { ok: false; error: 'network' | 'server' };
 
 export async function listAuctions(status?: AuctionStatus): Promise<ListAuctionsResult> {
-  // No server configured: the app runs on mock data, so the list does too.
-  if (!API_URL) return { ok: true, data: summaries.filter((a) => !status || a.status === status) };
+  if (!API_URL) {
+    // No server configured: only local dev runs on mock data. The dynamic import keeps mocks out of production bundles.
+    if (!import.meta.env.DEV) return { ok: false, error: 'server' };
+    const { summaries } = await import('../mock/auctions');
+    return { ok: true, data: summaries.filter((a) => !status || a.status === status) };
+  }
 
   try {
     const res = await fetch(`${API_URL}/auctions${status ? `?status=${status}` : ''}`);
