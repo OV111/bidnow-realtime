@@ -9,6 +9,19 @@ const joinLimit = createSocketEventLimit('join', policies.join);
 
 const viewerCount = (io: AppServer, room: string) => io.sockets.adapter.rooms.get(room)?.size ?? 0;
 
+const VIEWERS_THROTTLE_MS = 1000;
+const pendingViewerUpdates = new Map<string, NodeJS.Timeout>();
+
+// A burst of joins/leaves becomes one viewers:update per room per second, sent with the count at that moment.
+function scheduleViewersUpdate(io: AppServer, auctionId: string) {
+  const room = auctionRoom(auctionId);
+  if (pendingViewerUpdates.has(room)) return;
+  pendingViewerUpdates.set(room, setTimeout(() => {
+    pendingViewerUpdates.delete(room);
+    io.to(room).emit('viewers:update', { auctionId, count: viewerCount(io, room) });
+  }, VIEWERS_THROTTLE_MS));
+}
+
 export function registerRoomHandlers(io: AppServer, socket: AppSocket) {
   socket.on('auction:join', async (payload, ack) => {
     if (typeof ack !== 'function') return;
@@ -20,18 +33,23 @@ export function registerRoomHandlers(io: AppServer, socket: AppSocket) {
     if (!parsed.success) return ack({ ok: false, error: 'invalid_payload' });
     
     const { auctionId } = parsed.data;
+    const room = auctionRoom(auctionId);
     try {
-      const state = await auctionService.getState(auctionId);
-      if (!state) return ack({ ok: false, error: 'not_found' });
-
-      const room = auctionRoom(auctionId);
+      // Join before reading, so no event is missed between the snapshot and the room.
       await socket.join(room);
+      const state = await auctionService.getState(auctionId);
+      if (!state) {
+        await socket.leave(room);
+        return ack({ ok: false, error: 'not_found' });
+      }
+
       const viewers = viewerCount(io, room);
 
       ack({ ok: true, data: { ...state, viewers, serverTime: new Date().toISOString() } });
-      socket.to(room).emit('viewers:update', { auctionId, count: viewers });
+      scheduleViewersUpdate(io, auctionId);
     } catch (err) {
       console.error('join failed', err);
+      await socket.leave(room);
       ack({ ok: false, error: 'server_error' });
     }
   });
@@ -44,14 +62,14 @@ export function registerRoomHandlers(io: AppServer, socket: AppSocket) {
     const room = auctionRoom(auctionId);
     if (!socket.rooms.has(room)) return;
     await socket.leave(room);
-    io.to(room).emit('viewers:update', { auctionId, count: viewerCount(io, room) });
+    scheduleViewersUpdate(io, auctionId);
   });
 
   socket.on("disconnecting", () => {
     for (const room of socket.rooms) {
       if (!room.startsWith('auction:')) continue;
-      const auctionId = room.slice('auction:'.length);
-      socket.to(room).emit('viewers:update', { auctionId, count: viewerCount(io, room) - 1 })
+      // Sent after a delay, so the leaving socket is already out of the room and the count is exact.
+      scheduleViewersUpdate(io, room.slice('auction:'.length));
     }
   })
 

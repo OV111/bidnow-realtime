@@ -1,35 +1,23 @@
-import { redis } from "../redis";
-import { AuctionState } from "@shared/auction-service";
+import type { AuctionSummary } from '@shared/types';
+import { redis } from '../redis';
 
-const key = (id: string) => `auction:${id}`
+const LIST_TTL_SEC = 5;
+const listKey = (status: string, limit: number) => `auctions:list:${status}:${limit}`;
 
-export async function cacheAuction(state: AuctionState): Promise<void> {
+export async function getCachedList(status: string, limit: number): Promise<AuctionSummary[] | null> {
   try {
-    const secondsLeft = Math.ceil((new Date(state.endsAt).getTime() - Date.now()) / 1000)
-    await redis.set(key(state.id), JSON.stringify(state), 'EX', Math.max(60, secondsLeft + 3600))
-  } catch(err) {
-    console.log('cacheAuction falied',err)
-  }
-}
-
-export async function getCachedAuction(id: string): Promise<AuctionState | null> {
-  try {
-    const raw = await redis.get(key(id));
-    if (raw) {
-      return JSON.parse(raw) as AuctionState;
-    } else {
-      return null;
-    }
+    const raw = await redis.get(listKey(status, limit));
+    return raw ? (JSON.parse(raw) as AuctionSummary[]) : null;
   } catch (err) {
-    console.log('getCachedAuction failed', err)
+    console.error('getCachedList failed', err);
     return null;
   }
 }
 
-export async function deleteCachedAuction(id: string): Promise<void> {
+export async function cacheList(status: string, limit: number, list: AuctionSummary[]): Promise<void> {
   try {
-    await redis.del(key(id))
+    await redis.set(listKey(status, limit), JSON.stringify(list), 'EX', LIST_TTL_SEC);
   } catch (err) {
-    console.log("Deletion of cached auction failed", err)
+    console.error('cacheList failed', err);
   }
 }

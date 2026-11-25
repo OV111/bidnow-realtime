@@ -15,7 +15,7 @@ import type { AuctionStatus, AuctionSummary, EndReason, Result, UserDto } from '
 import { config } from '../config';
 import { prisma } from '../db';
 import { notify } from '../notifications/userFlow';
-import { cacheAuction, deleteCachedAuction } from '../cache/auctionCache';
+import { cacheList, getCachedList } from '../cache/auctionCache';
 
 const SNAPSHOT_BIDS = 50;
 
@@ -96,14 +96,20 @@ function toState(row: AuctionRow): AuctionState {
 
 export class PrismaAuctionService implements AuctionService {
   async listAuctions({ status, limit }: { status?: AuctionStatus; limit?: number } = {}): Promise<AuctionSummary[]> {
+    const take = Math.min(limit ?? config.LIST_PAGE_DEFAULT, config.LIST_PAGE_MAX);
+    const cacheStatus = status ?? 'all';
+
+    const cached = await getCachedList(cacheStatus, take);
+    if (cached) return cached;
+
     const rows = await prisma.auction.findMany({
       where: status ? { status } : undefined,
       orderBy: { createdAt: 'desc' },
-      take: Math.min(limit ?? config.LIST_PAGE_DEFAULT, config.LIST_PAGE_MAX),
+      take,
       include: { _count: { select: { bids: true } } },
     });
 
-    return rows.map((row) => ({
+    const list = rows.map((row) => ({
       id: row.id,
       title: row.title,
       photoUrl: row.photoUrl,
@@ -115,6 +121,9 @@ export class PrismaAuctionService implements AuctionService {
       endsAt: row.endsAt.toISOString(),
       bidCount: row._count.bids,
     }));
+
+    void cacheList(cacheStatus, take, list);
+    return list;
   }
 
   async getState(auctionId: string) {
@@ -134,9 +143,7 @@ export class PrismaAuctionService implements AuctionService {
       },
       include: withRelations,
     });
-    const state = toState(row);
-    void cacheAuction(state);
-    return state;
+    return toState(row);
   }
 
   async placeBid({
@@ -206,7 +213,6 @@ export class PrismaAuctionService implements AuctionService {
     if (!outcome.ok) {
       return outcome.error === 'retry' ? { ok: false, error: 'too_low' } : outcome;
     }
-    void deleteCachedAuction(auctionId);
     const { auction, previousLeaderId, data } = outcome;
     if (previousLeaderId && previousLeaderId !== userId) {
       notify({
@@ -247,7 +253,6 @@ export class PrismaAuctionService implements AuctionService {
 
       return null;
     }
-    void deleteCachedAuction(auctionId)
     notifyWon(closed.auction, closed.ended);
     return closed.ended;
   }
@@ -291,7 +296,6 @@ export class PrismaAuctionService implements AuctionService {
     if (!outcome.ok) {
       return outcome.error === 'retry' ? { ok: false, error: 'not_live' } : outcome;
     }
-    void deleteCachedAuction(auctionId);
     notifyWon(outcome.auction, outcome.data);
     if (outcome.auction.leaderId && outcome.auction.leaderId !== userId) {
       notify({

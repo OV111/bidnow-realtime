@@ -3,7 +3,6 @@ import { auctionRoom } from "@shared/events";
 import { prisma } from '../db';
 import type { AppServer } from "../gateway/types";
 import { auctionService } from ".";
-import { deleteCachedAuction } from "../cache/auctionCache";
 
 const MAX_TIMER_MS = 60 * 60_000;
 const timers = new Map<string, NodeJS.Timeout>();
@@ -27,7 +26,7 @@ export function cancelAuctionClose(auctionId: string) {
   timers.delete(auctionId);
 }
 
-export function startAuctionCloser(io: AppServer, intervalMs: number = 1000) {
+export function startAuctionCloser(io: AppServer, intervalMs: number = 5000) {
   closeAndBroadcast = async (auctionId) => {
     try {
       const ended = await auctionService.closeAuction(auctionId);
@@ -55,7 +54,6 @@ export function startAuctionCloser(io: AppServer, intervalMs: number = 1000) {
           data: { status: 'LIVE' },
         });
         if (promoted.count === 0) continue;
-        void deleteCachedAuction(id)
         io.to(auctionRoom(id)).emit('auction:started', { auctionId: id });
         scheduleAuctionClose(id, endsAt.toISOString());
       }

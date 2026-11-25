@@ -6,8 +6,6 @@ import { clearToken } from '../../../lib/auth';
 import { createSocket, type LiveSocket } from '../../../lib/socket';
 import { SOCKET_URL } from '../../../lib/env';
 
-// Without VITE_SOCKET_URL (local dev only; production throws in lib/env) the UI runs on a mock socket.
-// The dynamic import keeps the mock out of production bundles.
 async function loadSocket(token: string | null): Promise<LiveSocket> {
   if (SOCKET_URL) return createSocket(SOCKET_URL, token);
   if (!import.meta.env.DEV) throw new Error('VITE_SOCKET_URL is required in production');
@@ -57,8 +55,6 @@ export function useLiveAuction(auctionId: string, token: string | null = null): 
   const socketRef = useRef<LiveSocket | null>(null);
 
   useEffect(() => {
-    // New auction or token: drop the previous auction's data so it never shows under the new URL.
-    setState(initialState);
     let cancelled = false;
     let active: LiveSocket | null = null;
 
@@ -137,6 +133,8 @@ export function useLiveAuction(auctionId: string, token: string | null = null): 
       cancelled = true;
       socketRef.current = null;
       active?.disconnect();
+      // New auction or token: drop the previous auction's data so it never shows under the new URL.
+      setState(initialState);
     };
   }, [auctionId, token]);
 
