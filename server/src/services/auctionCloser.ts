@@ -26,7 +26,7 @@ export function cancelAuctionClose(auctionId: string) {
   timers.delete(auctionId);
 }
 
-export function startAuctionCloser(io: AppServer, intervalMs: number = 1000) {
+export function startAuctionCloser(io: AppServer, intervalMs: number = 5000) {
   closeAndBroadcast = async (auctionId) => {
     try {
       const ended = await auctionService.closeAuction(auctionId);

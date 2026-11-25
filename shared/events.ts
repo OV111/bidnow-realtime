@@ -16,6 +16,7 @@ export type BidError =
   | 'not_found'
   | 'not_live'
   | 'too_low'
+  | 'use_buy_now'
   | 'own_auction'
   | 'already_leading'
   | 'rate_limited'

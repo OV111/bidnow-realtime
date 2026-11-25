@@ -18,7 +18,7 @@ export default function AuctionPage() {
   const [params] = useSearchParams();
   const token = params.get('guest') ? null : getToken();
   const userId = getUserId(token);
-  const { phase, auction: snapshot, connected, sessionExpired, placeBid, buyNow } = useLiveAuction(id, token);
+  const { phase, auction: snapshot, connected, sessionExpired, offsetMs, placeBid, buyNow } = useLiveAuction(id, token);
   const isGuest = !userId || sessionExpired;
 
   if (phase === 'loading') return <Spinner label={t('state.loading')} />;
@@ -86,7 +86,7 @@ export default function AuctionPage() {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <PriceLeader snapshot={snapshot} userId={userId} />
-            <Countdown snapshot={snapshot} />
+            <Countdown snapshot={snapshot} offsetMs={offsetMs} />
           </div>
           {snapshot.status === 'ENDED' && <WinnerBanner snapshot={snapshot} userId={userId} />}
           {live && <StandingIndicator standing={getStanding(snapshot, userId)} />}

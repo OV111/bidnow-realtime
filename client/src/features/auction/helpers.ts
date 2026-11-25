@@ -20,6 +20,8 @@ export function bidErrorKey(error: BidFailure, status: AuctionSnapshot['status']
   switch (error) {
     case 'too_low':
       return 'bid.error.BID_TOO_LOW';
+    case 'use_buy_now':
+      return 'bid.error.USE_BUY_NOW';
     case 'not_live':
       return status === 'ENDED' ? 'bid.error.AUCTION_ENDED' : 'bid.error.AUCTION_NOT_LIVE';
     case 'unauthorized':

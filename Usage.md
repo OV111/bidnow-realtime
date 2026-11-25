@@ -2,7 +2,7 @@ npm run db:up           # start Postgres + RabbitMQ (not needed for the UI)
 npm run dev             # start server and client together
 npm run dev:client      # start only the client (UI runs on mock data)
 npm run dev:server      # start only the server
-npm run install:all     # install server and client dependencies
+npm run install:all     # install root, server and client dependencies (run once after cloning)
 
 Pages (client, http://localhost:5173)
 /auctions               # auctions list (Live / Upcoming / All)

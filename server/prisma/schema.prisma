@@ -40,6 +40,9 @@ model Auction {
   winner       Winner?
 
   @@index([status, endsAt])
+  @@index([status, startsAt])
+  @@index([status, createdAt])
+  @@index([sellerId, status])
   @@map("auctions")
 }
 
