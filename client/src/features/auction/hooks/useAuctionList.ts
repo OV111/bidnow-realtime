@@ -4,7 +4,6 @@ import { listAuctions } from '../../../lib/api';
 
 type Loaded = { key: string; auctions: AuctionSummary[] | null };
 
-// Loads the auction list for one status filter. `retry` fetches it again after a failure.
 export function useAuctionList(status?: AuctionStatus) {
   const [attempt, setAttempt] = useState(0);
   const [loaded, setLoaded] = useState<Loaded | null>(null);
@@ -20,7 +19,6 @@ export function useAuctionList(status?: AuctionStatus) {
     };
   }, [status, key]);
 
-  // The stored result belongs to an older filter/attempt until the new request answers.
   const current = loaded && loaded.key === key ? loaded : null;
   const phase = current === null ? 'loading' : current.auctions === null ? 'error' : 'ready';
 
