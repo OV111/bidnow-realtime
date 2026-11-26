@@ -1,7 +1,5 @@
 import type { AuctionSnapshot, AuctionSummary, BidDto } from '@shared/types';
 
-export const currentUser = { id: 'me', name: 'You' };
-
 const names: Record<string, string> = {
   me: 'You',
   'seller-1': 'Anna Petrosyan',
@@ -11,18 +9,18 @@ const names: Record<string, string> = {
   davit: 'Davit',
 };
 
-const minutes = (n: number) => n * 60_000;
-const at = (offsetMs: number) => new Date(Date.now() + offsetMs).toISOString();
+const minutes = (count: number) => count * 60_000;
+const at = (clockOffsetMs: number) => new Date(Date.now() + clockOffsetMs).toISOString();
 
 function bids(auctionId: string, list: [string, number][]): BidDto[] {
   return list
-    .map(([userId, amount], i) => ({
-      id: `${auctionId}-${i}`,
+    .map(([userId, amount], index) => ({
+      id: `${auctionId}-${index}`,
       auctionId,
       userId,
       userName: names[userId],
       amount,
-      createdAt: at(-minutes(list.length - i)),
+      createdAt: at(-minutes(list.length - index)),
     }))
     .reverse();
 }
@@ -177,19 +175,19 @@ export const auctions: AuctionSnapshot[] = [
   },
 ];
 
-export const summaries: AuctionSummary[] = auctions.map((a) => ({
-  id: a.id,
-  title: a.title,
-  photoUrl: a.photoUrl,
-  currency: a.currency,
-  currentPrice: a.currentPrice,
-  buyNowPrice: a.buyNowPrice,
-  status: a.status,
-  startsAt: a.startsAt,
-  endsAt: a.endsAt,
-  bidCount: a.bids.length,
+export const summaries: AuctionSummary[] = auctions.map((auction) => ({
+  id: auction.id,
+  title: auction.title,
+  photoUrl: auction.photoUrl,
+  currency: auction.currency,
+  currentPrice: auction.currentPrice,
+  buyNowPrice: auction.buyNowPrice,
+  status: auction.status,
+  startsAt: auction.startsAt,
+  endsAt: auction.endsAt,
+  bidCount: auction.bids.length,
 }));
 
 export function getAuction(id: string | undefined): AuctionSnapshot | undefined {
-  return auctions.find((a) => a.id === id);
+  return auctions.find((auction) => auction.id === id);
 }

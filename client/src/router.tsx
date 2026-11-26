@@ -1,23 +1,23 @@
 import { createBrowserRouter, redirect } from 'react-router-dom';
-import { AppLayout } from './components/AppLayout';
-import AuctionPage from './features/auction/AuctionPage';
-import AuctionsListPage from './features/auction/AuctionsListPage';
-import CreateAuctionPage from './features/createAuction/CreateAuctionPage';
-import LivePage from './features/live/LivePage';
 
-const toAuctions = () => redirect('/auctions');
+import AppLayout from '@/components/AppLayout';
+import NotFound from '@/components/NotFound';
+import CreateAuctionPage from '@/features/auctions/create/CreateAuctionPage';
+import AuctionsListPage from '@/features/auctions/list/AuctionsListPage';
+import LivePage from '@/features/auctions/live/LivePage';
+import AuctionPage from '@/features/auctions/room/AuctionPage';
 
 export const router = createBrowserRouter([
+  { path: '/auctions/:id/live', element: <LivePage /> },
   {
     path: '/',
     element: <AppLayout />,
     children: [
-      { index: true, loader: toAuctions },
+      { index: true, loader: () => redirect('/auctions') },
       { path: 'auctions', element: <AuctionsListPage /> },
       { path: 'auctions/new', element: <CreateAuctionPage /> },
       { path: 'auctions/:id', element: <AuctionPage /> },
-      { path: 'auctions/:id/live', element: <LivePage /> },
-      { path: '*', loader: toAuctions },
+      { path: '*', element: <NotFound /> },
     ],
   },
 ]);

@@ -1,13 +1,10 @@
 import { createRoot } from 'react-dom/client';
 import { RouterProvider } from 'react-router-dom';
 
-import { router } from './router';
-import './index.css';
+import { router } from '@/router';
 
-const rootElement = document.getElementById('root');
+import '@/index.css';
 
-if (!rootElement) {
-  throw new Error('Root element not found');
-}
+const root = document.getElementById('root') as HTMLElement;
 
-createRoot(rootElement).render(<RouterProvider router={router} />);
+createRoot(root).render(<RouterProvider router={router} />);
