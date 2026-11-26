@@ -1,15 +1,16 @@
 @import "tailwindcss";
+
 @theme {
   --animate-bid-flash: bid-flash 700ms ease-out;
   --animate-slide-in: slide-in 400ms ease-out;
-  --animate-extended: extended 2.5s ease-out forwards;
+  --animate-fade-in-out: fade-in-out 2.5s ease-out forwards;
 
   @keyframes bid-flash {
-    0% {
+    from {
       transform: scale(1.1);
       color: var(--color-amber-300);
     }
-    100% {
+    to {
       transform: scale(1);
     }
   }
@@ -25,16 +26,14 @@
     }
   }
 
-  @keyframes extended {
-    0% {
+  @keyframes fade-in-out {
+    from,
+    to {
       opacity: 0;
     }
     10%,
     80% {
       opacity: 1;
-    }
-    100% {
-      opacity: 0;
     }
   }
 }

@@ -35,13 +35,25 @@ npm run install:all
 cp server/.env.example server/.env
 cp client/.env.example client/.env
 npm run db:up
-npm run db:deploy --prefix server
-npm run db:generate --prefix server
-npm run db:seed --prefix server
+npm run db:setup
 npm run dev
 ```
 
 Open http://localhost:5173.
+
+## Commands
+
+Run from the repo root:
+
+| Command | Does |
+|---|---|
+| `npm run install:all` | Install root, server and client dependencies |
+| `npm run db:up` | Start Postgres, Redis and RabbitMQ |
+| `npm run dev` | Start server and client together |
+| `npm run dev:client` | Start only the client (mock data if `VITE_SOCKET_URL` is empty) |
+| `npm run dev:server` | Start only the server |
+
+Pages, mock data and the mock login are described in [client/README.md](client/README.md). The data shapes shared by client and server are in `shared/types.ts` and `shared/events.ts`.
 
 ## Tests
 
